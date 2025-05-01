@@ -17,7 +17,9 @@
     {
         "frankboesing/FastCRC": "^1.41",
         "lz4": "https://github.com/ab-tools/lz4.git",
-        "PN7160": "https://github.com/Strooom/PN7160#RP2040"
+        "PN7160": "https://github.com/Strooom/PN7160#RP2040",
+        "BS811X_I2C": "https://github.com/ab-tools/BS811X_I2C",
+        "hendrikve/NXP PCA9633": "^1.1.1"
     }
   
 }

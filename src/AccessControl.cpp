@@ -66,6 +66,7 @@ void AccessControl::setup()
     initResetTimer = delayTimerInit();
 
     initNfc();
+    initKeypad();
 
     logInfoP("Fingerprint module ready.");
     logIndentDown();
@@ -89,8 +90,11 @@ void AccessControl::initNfc(bool testMode, uint8_t testModeNfc)
     logging::enable(logging::source::tagEvents);
 #endif
 
-    if (!testMode && ParamACC_NfcScanner == 2 ||
-        testMode && testModeNfc == 2)
+    uint8_t nfcType =
+        (!testMode && ParamACC_NfcScanner == 2 ||
+         testMode && testModeNfc == 2) ? 2 : 1;
+
+    if (nfcType == 2)
     {
         openknxGPIOModule.pinMode(0x0200, OUTPUT);
         openknxGPIOModule.digitalWrite(0x0200, LOW);
@@ -99,7 +103,17 @@ void AccessControl::initNfc(bool testMode, uint8_t testModeNfc)
     }
 
     PN7160Interface::initialize(NFC_IRQ_PIN, NFC_VEN_PIN, NFC_PN7160_ADDR);
-    logInfoP("Initialized PN7160.");
+    logInfoP("Initialized PN7160 (nfcType=%u).", nfcType);
+}
+
+void AccessControl::initKeypad(bool testMode)
+{
+    if (!testMode &&
+        ParamACC_NfcScanner == 0)
+        return;
+
+    bs8116.begin("8116");
+    logInfoP("Initialized BS8116.");
 }
 
 bool AccessControl::switchFingerprintPower(bool on, bool testMode)
@@ -530,6 +544,40 @@ void AccessControl::loopNfc(bool testMode)
         nci::reset();
         logDebugP("NCI reset.");
     }
+}
+
+void AccessControl::loopKeypad(bool testMode)
+{
+    if (!testMode &&
+        ParamACC_NfcScanner == 0)
+        return;
+    
+    uint16_t keymap = bs8116.readKeys();
+    String map;
+    for(uint8_t i = 0;i < 16;i++) {           //For 8112 should be 12 
+      uint8_t bit = bitRead(keymap, i);
+      if(bit) { map += '1'; }
+      else { map += '0'; }
+    }
+    Serial.print("Key status:");
+    Serial.print(map);
+
+    uint8_t key = bs8116.getKey_active();
+    Serial.print("  Pressed key: ");
+    Serial.println(key);
+
+    if(bs8116.getKey_passive(12)) {
+      Serial.println("Key 12 is pressed！");
+    }
+
+    if (bs8116.getKey_edge(1, 2)) {
+        Serial.println("Key 2 rising edge detected！");
+    }
+    else if (bs8116.getKey_edge(2, 2)) {
+        Serial.println("Key 2 falling edge detected！");
+    }
+
+    delay(1000);
 }
 
 void AccessControl::processNfcScanSuccess(uint16_t foundId, bool external)
@@ -2146,24 +2194,29 @@ bool AccessControl::processCommand(const std::string cmd, bool diagnoseKo)
 #endif
     else if (cmd.length() == 13 && cmd.substr(4, 9) == "test mode")
     {
-        runTestMode(0);
+        runTestMode(0, false);
         result = true;
     }
     else if (cmd.length() == 13 && cmd.substr(4, 9) == "test nfc1")
     {
-        runTestMode(1);
+        runTestMode(1, false);
         result = true;
     }
     else if (cmd.length() == 13 && cmd.substr(4, 9) == "test nfc2")
     {
-        runTestMode(2);
+        runTestMode(2, false);
+        result = true;
+    }
+    else if (cmd.length() == 13 && cmd.substr(4, 9) == "test key")
+    {
+        runTestMode(0, true);
         result = true;
     }
 
     return result;
 }
 
-void AccessControl::runTestMode(uint8_t testModeNfc)
+void AccessControl::runTestMode(uint8_t testModeNfc, bool testModeKeypad)
 {
     logInfoP("Starting test mode");
     logIndentUp();
@@ -2237,6 +2290,17 @@ void AccessControl::runTestMode(uint8_t testModeNfc)
         u_int32_t nfcWaitTimer = delayTimerInit();
         while (!testModeNfcFound && !delayCheck(nfcWaitTimer, 10000))
             loopNfc(true);
+        logIndentDown();
+    }
+
+    if (testModeKeypad > 0)
+    {
+        logInfoP("Waiting for keypad input:");
+        logIndentUp();
+        initKeypad(true);
+        u_int32_t keypadWaitTimer = delayTimerInit();
+        while (!testModeNfcFound && !delayCheck(keypadWaitTimer, 100000))
+            loopKeypad(true);
         logIndentDown();
     }
 

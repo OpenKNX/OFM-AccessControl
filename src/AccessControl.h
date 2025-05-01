@@ -10,6 +10,7 @@
 #include "pn7160interface/pn7160interface.hpp"
 #include "logging/logging.hpp"
 #include "nci/nci.hpp"
+#include "BS811X.h"
 
 #define INIT_RESET_TIMEOUT 1000
 #define LED_RESET_TIMEOUT 1000
@@ -90,6 +91,8 @@ class AccessControl : public OpenKNX::Module
     void initFlashNfc();
     void initNfc(bool testMode = false, uint8_t testModeNfc = 0);
     void loopNfc(bool testMode = false);
+    void initKeypad(bool testMode = false);
+    void loopKeypad(bool testMode = false);
     void processFingerScanSuccess(uint16_t location, bool external = false);
     void processNfcScanSuccess(uint16_t nfcId, bool external = false);
     bool enrollFinger(uint16_t location);
@@ -124,7 +127,7 @@ class AccessControl : public OpenKNX::Module
     void handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertySearchNfcIdByTag(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     static void delayCallback(uint32_t period);
-    void runTestMode(uint8_t testModeNfc);
+    void runTestMode(uint8_t testModeNfc, bool testModeKeypad);
 
     FastCRC16 crc16;
     FastCRC32 crc32;
@@ -185,6 +188,8 @@ class AccessControl : public OpenKNX::Module
     uint32_t readRequestDelay = 0;
 
     bool testModeNfcFound = false;
+
+    BS811X bs8116;
 };
 
 extern AccessControl openknxAccessControl;
