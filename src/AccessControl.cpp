@@ -111,6 +111,17 @@ void AccessControl::initKeypad(bool testMode)
     if (!testMode &&
         ParamACC_NfcScanner == 0)
         return;
+        logInfoP("test1.");
+#ifdef KEYPAD_PCA9633_ADDR
+    pca9633.begin(KEYPAD_PCA9633_ADDR, &OPENKNX_GPIO_WIRE);
+    logInfoP("test2.");
+    pca9633.setLdrStateAll(LDR_STATE_IND_GRP);
+    logInfoP("test3.");
+    pca9633.setGroupControlMode(GROUP_CONTROL_MODE_DIMMING);
+    logInfoP("test4.");
+    pca9633.setRGBW(255, 255, 255, 255);
+    logInfoP("Initialized PCA9633.");
+#endif
 
     bs8116.begin("8116");
     logInfoP("Initialized BS8116.");
@@ -2207,7 +2218,7 @@ bool AccessControl::processCommand(const std::string cmd, bool diagnoseKo)
         runTestMode(2, false);
         result = true;
     }
-    else if (cmd.length() == 13 && cmd.substr(4, 9) == "test key")
+    else if (cmd.length() == 12 && cmd.substr(4, 8) == "test key")
     {
         runTestMode(0, true);
         result = true;
@@ -2298,6 +2309,82 @@ void AccessControl::runTestMode(uint8_t testModeNfc, bool testModeKeypad)
         logInfoP("Waiting for keypad input:");
         logIndentUp();
         initKeypad(true);
+
+        // 1. turn on/off
+        pca9633.turnOff();
+        delay(500);
+
+        pca9633.turnOn();
+        delay(500);
+
+        // 2. individual dimming (setRGB() uses setPwm() internally)
+        pca9633.setRGBW(255, 255, 255, 255);
+        delay(500);
+
+        pca9633.setRGBW(255, 0, 0, 255);
+        delay(500);
+
+        pca9633.setRGBW(0, 255, 0, 255);
+        delay(500);
+
+        pca9633.setRGBW(0, 0, 255, 255);
+        delay(500);
+
+        // 3. group dimming
+        pca9633.setRGBW(255, 255, 255, 255);
+        pca9633.setLdrStateAll(LDR_STATE_IND_GRP);
+
+        for (int pwm = 255; pwm >= 0; pwm--) {
+            pca9633.setGrpPwm(pwm);
+            delay(20);
+        }
+        delay(1000);
+
+        // 4. changing ldr state
+        pca9633.setGrpPwm(255);
+        pca9633.setRGBW(255, 255, 255, 255);
+        pca9633.setLdrState(LDR_STATE_OFF, BIT_LDR1);
+        // color should be magenta
+        delay(500);
+
+        pca9633.setGrpPwm(0);
+        pca9633.setRGBW(0, 0, 0, 0);
+        pca9633.setLdrState(LDR_STATE_ON, BIT_LDR1);
+        // color should be green
+        delay(500);
+
+        pca9633.setGrpPwm(255);
+        pca9633.setRGBW(255, 128, 0, 0);
+        pca9633.setLdrState(LDR_STATE_IND, BIT_LDR1);
+        // color should be orange
+        delay(500);
+
+        pca9633.setGrpPwm(0);
+        pca9633.setRGBW(255, 255, 255, 255);
+        pca9633.setLdrState(LDR_STATE_IND_GRP, BIT_LDR1);
+        // should be no color at all
+        delay(500);
+
+        // 5. test blinking
+        pca9633.setGrpPwm(255);
+        pca9633.setRGBW(255, 255, 255, 255);
+        pca9633.setGroupControlMode(GROUP_CONTROL_MODE_BLINKING);
+        pca9633.setBlinking(BLINKING_PERIOD_1_S, BLINKING_RATIO_BALANCED);
+        delay(10000);
+        pca9633.setGroupControlMode(GROUP_CONTROL_MODE_DIMMING);
+
+        // 6. sleep mode
+        //pca9633.setRGB(0, 255, 255);
+        pca9633.setRGBW(0, 0, 0, 255);
+        delay(500);
+
+        pca9633.sleep();
+        delay(2000);
+
+        pca9633.wakeUp();
+        delay(500);
+        pca9633.setRGBW(0, 0, 0, 128);
+
         u_int32_t keypadWaitTimer = delayTimerInit();
         while (!testModeNfcFound && !delayCheck(keypadWaitTimer, 100000))
             loopKeypad(true);

@@ -11,6 +11,7 @@
 #include "logging/logging.hpp"
 #include "nci/nci.hpp"
 #include "BS811X.h"
+#include "PCA9633.h"
 
 #define INIT_RESET_TIMEOUT 1000
 #define LED_RESET_TIMEOUT 1000
@@ -190,6 +191,10 @@ class AccessControl : public OpenKNX::Module
     bool testModeNfcFound = false;
 
     BS811X bs8116;
+
+#ifdef KEYPAD_PCA9633_ADDR
+    PCA9633 pca9633 = PCA9633(REG_PWM0, REG_PWM1, REG_PWM2, REG_PWM3);
+#endif
 };
 
 extern AccessControl openknxAccessControl;
