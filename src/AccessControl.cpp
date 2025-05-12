@@ -2304,6 +2304,7 @@ void AccessControl::runTestMode(uint8_t testModeNfc, bool testModeKeypad)
         logIndentDown();
     }
 
+#ifdef KEYPAD_PCA9633_ADDR
     if (testModeKeypad > 0)
     {
         logInfoP("Waiting for keypad input:");
@@ -2390,6 +2391,7 @@ void AccessControl::runTestMode(uint8_t testModeNfc, bool testModeKeypad)
             loopKeypad(true);
         logIndentDown();
     }
+#endif
 
     logInfoP("Testing finished.");
     logIndentDown();
