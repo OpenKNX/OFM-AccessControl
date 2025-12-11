@@ -77,7 +77,7 @@
               <ParameterType Id="%AID%_PT-FingerprintScanner" Name="FingerprintScanner">
                 <TypeRestriction Base="Value" SizeInBit="2">
                   <Enumeration Text="Kein Fingerprint" Value="3" Id="%ENID%" />
-                  <Enumeration Text="R503" Value="0" Id="%ENID%" />
+                  <Enumeration Text="R503/R502" Value="0" Id="%ENID%" />
                   <Enumeration Text="R503S" Value="1" Id="%ENID%" />
                   <Enumeration Text="R503Pro" Value="2" Id="%ENID%" />
                 </TypeRestriction>
