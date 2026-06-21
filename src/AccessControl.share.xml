@@ -41,6 +41,7 @@
                   <Enumeration Text="Deaktiviert" Value="0" Id="%ENID%" />
                   <Enumeration Text="Erstmalig festsetzen" Value="1" Id="%ENID%" />
                   <Enumeration Text="Passwort ändern" Value="2" Id="%ENID%" />
+                  <Enumeration Text="Passwort von existierendem Gerät eingeben" Value="3" Id="%ENID%" />
                 </TypeRestriction>
               </ParameterType>
               <ParameterType Id="%AID%_PT-Text15Byte" Name="Text15Byte">
@@ -572,6 +573,10 @@
                           <ParameterRefRef RefId="%AID%_P-%T%000022_R-%T%00002201" IndentLevel="1" HelpContext="%DOC%" />
                           <ParameterRefRef RefId="%AID%_P-%T%000021_R-%T%00002101" IndentLevel="1" HelpContext="%DOC%" />
                           <Button Id="%AID%_B-%T%00006" Text="Jetzt Passwort ändern" Name="setPassword" EventHandler="ACC_setFingerPassword" EventHandlerOnline="ConnectionOriented" />
+                        </when>
+                        <when test="3">
+                          <ParameterRefRef RefId="%AID%_P-%T%000021_R-%T%00002101" IndentLevel="1" HelpContext="%DOC%" />
+                          <Button Id="%AID%_B-%T%00005" Text="Passwort speichern" Name="setPassword" EventHandler="ACC_setFingerPassword" EventHandlerOnline="ConnectionOriented" />
                         </when>
                       </choose>
                       <ParameterRefRef RefId="%AID%_P-%T%000015_R-%T%00001501" IndentLevel="1" HelpContext="%DOC%" />

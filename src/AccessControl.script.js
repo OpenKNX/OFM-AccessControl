@@ -499,7 +499,7 @@ function ACC_setFingerPassword(device, online, progress, context) {
     var parPasswordNew = device.getParameterByName("ACC_PasswordNew");
     var parPasswordOld = device.getParameterByName("ACC_PasswordOld");
     
-    progress.setText("Fingerprint: " + parPasswordOption.value == 1 ? "Passwort festsetzen..." : "Passwort ändern...");
+    progress.setText("Fingerprint: " + (parPasswordOption.value == 1 || parPasswordOption.value == 3) ? "Passwort festsetzen..." : "Passwort ändern...");
     online.connect();
 
     var data = [21]; // internal function ID
@@ -537,7 +537,7 @@ function ACC_setFingerPassword(device, online, progress, context) {
     parPasswordAlreadySet.value = parPasswordNew.value == "0" ? 0 : 1;
 
     online.disconnect();
-    progress.setText("Fingerprint: " + parPasswordOption.value == 1 ? "Passwort festgesetzt." : "Passwort geändert.");
+    progress.setText("Fingerprint: " + (parPasswordOption.value == 1 || parPasswordOption.value == 3) ? "Passwort festgesetzt." : "Passwort geändert.");
 }
 
 function ACC_checkNfcAction(device, online, progress, context) {

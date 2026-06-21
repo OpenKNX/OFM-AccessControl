@@ -1722,67 +1722,82 @@ void AccessControl::handleFunctionPropertySetFingerPassword(uint8_t *data, uint8
         newPasswordCrc = crc32.crc32((uint8_t *)newPassword, 16);
     logDebugP("newPassword: %s (crc: %u)", newPassword, newPasswordCrc);
 
-    // change password
-    uint32_t oldPasswordCrc = 0;
-    if (passwordOption == 2)
+    if (passwordOption == 3)
     {
-        char oldPassword[16] = {};
-        for (uint8_t i = 0; i < 16; i++)
-        {
-            dataOffset++;
-            memcpy(oldPassword + i, data + dataOffset, 1);
+        logDebugP("Saving new password directly to flash.");
+        _fingerprintStorage.writeInt(FLASH_FINGER_SCANNER_PASSWORD_OFFSET, newPasswordCrc);
+        _fingerprintStorage.commit();
 
-            if (oldPassword[i] == 0) // null termination
-                break;
-        }
+        finger->close();
+        initFingerprintScanner();
+        finger->start();
 
-        if (oldPassword[0] != 48 || // = "0": if user inputs only "0", we just use it as is without CRC
-            oldPassword[1] != 0)    // null termination
-            oldPasswordCrc = crc32.crc32((uint8_t *)oldPassword, 16);
-        logDebugP("oldPassword: %s (crc: %u)", oldPassword, oldPasswordCrc);
-    }
-
-    uint32_t currentCrc = _fingerprintStorage.readInt(FLASH_FINGER_SCANNER_PASSWORD_OFFSET);
-    logDebugP("currentCrc: %u", currentCrc);
-
-    bool success = false;
-    if (currentCrc == oldPasswordCrc)
-    {
-        logDebugP("Current matches old CRC.");
-        logIndentUp();
-
-        logInfoP("Setting new fingerprint scanner password.");
-        logIndentUp();
-
-        if (switchFingerprintPower(true))
-            success = finger->setPassword(newPasswordCrc);
-        
-        resetFingerLedTimer = delayTimerInit();
-        logInfoP(success ? "Success." : "Failed.");
-        logIndentDown();
-        
-        if (success)
-        {
-            logDebugP("Saving new password in flash.");
-            _fingerprintStorage.writeInt(FLASH_FINGER_SCANNER_PASSWORD_OFFSET, newPasswordCrc);
-            _fingerprintStorage.commit();
-
-            finger->close();
-            initFingerprintScanner();
-            finger->start();
-        }
-
-        resetFingerLedTimer = delayTimerInit();
-        logIndentDown();
-
-        resultData[0] = success ? 0 : 2;
+        resultData[0] = 0;
     }
     else
     {
-        logDebugP("Invalid old password provided.");
-        resultData[0] = 1;
+        // change password
+        uint32_t oldPasswordCrc = 0;
+        if (passwordOption == 2)
+        {
+            char oldPassword[16] = {};
+            for (uint8_t i = 0; i < 16; i++)
+            {
+                dataOffset++;
+                memcpy(oldPassword + i, data + dataOffset, 1);
+
+                if (oldPassword[i] == 0) // null termination
+                    break;
+            }
+
+            if (oldPassword[0] != 48 || // = "0": if user inputs only "0", we just use it as is without CRC
+                oldPassword[1] != 0)    // null termination
+                oldPasswordCrc = crc32.crc32((uint8_t *)oldPassword, 16);
+            logDebugP("oldPassword: %s (crc: %u)", oldPassword, oldPasswordCrc);
+        }
+
+        uint32_t currentCrc = _fingerprintStorage.readInt(FLASH_FINGER_SCANNER_PASSWORD_OFFSET);
+        logDebugP("currentCrc: %u", currentCrc);
+
+        bool success = false;
+        if (currentCrc == oldPasswordCrc)
+        {
+            logDebugP("Current matches old CRC.");
+            logIndentUp();
+
+            logInfoP("Setting new fingerprint scanner password.");
+            logIndentUp();
+
+            if (switchFingerprintPower(true))
+                success = finger->setPassword(newPasswordCrc);
+            
+            resetFingerLedTimer = delayTimerInit();
+            logInfoP(success ? "Success." : "Failed.");
+            logIndentDown();
+            
+            if (success)
+            {
+                logDebugP("Saving new password in flash.");
+                _fingerprintStorage.writeInt(FLASH_FINGER_SCANNER_PASSWORD_OFFSET, newPasswordCrc);
+                _fingerprintStorage.commit();
+
+                finger->close();
+                initFingerprintScanner();
+                finger->start();
+            }
+
+            resetFingerLedTimer = delayTimerInit();
+            logIndentDown();
+
+            resultData[0] = success ? 0 : 2;
+        }
+        else
+        {
+            logDebugP("Invalid old password provided.");
+            resultData[0] = 1;
+        }
     }
-    
+
     resultLength = 1;
     logIndentDown();
 }
