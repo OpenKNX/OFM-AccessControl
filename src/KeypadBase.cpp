@@ -133,6 +133,9 @@ void KeypadBase::setFeedback(FeedbackType feedbackType)
             case FeedbackType::PauseExceeded:
                 openknxFeedback.setBuzzer(true, false, 1000);
                 break;
+            // ToDo:
+            // add Buzzer Feedback for success and
+            // use Beep-Codes to differentiate between different status => OFM-Feedback change neccessary
         }
     }
 }
