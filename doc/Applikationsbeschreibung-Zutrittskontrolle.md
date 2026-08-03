@@ -12,7 +12,7 @@ cSpell:words mgeramb ambiente Ambientenbeleuchtung
 
 Die Applikation Zutrittskontrolle erlaubt eine Parametrisierung einer Zutrittskontrolle per Fingerabdruck oder NFC-Tag mit der ETS.
 
-Es gibt eine kleinere Applikationsversion mit bis zu 200 Aktionen/Fingerzuordnungen/NFC-Tags und eine größere mit bis zu 1500 Aktionen/Fingerzuordnungen/NFC-Tags. Während die größere hauptsächlich für das "großen" Lesegerät R503Pro angeboten wird, kann sie bei Bedarf an mehr als 200 Fingerzuordnungen auch für das "kleinere" Lesegerät R503 verwendet werden.
+Es gibt eine kleinere Applikationsversion mit bis zu 200 Aktionen/Fingerzuordnungen/NFC-Tags und eine größere mit bis zu 1500 Aktionen/Fingerzuordnungen/NFC-Tags. Während die größere hauptsächlich für das "großen" Lesegerät R503Pro angeboten wird, kann sie bei Bedarf an mehr als 200 Fingerzuordnungen auch für das "kleinere" Lesegerät R503/R502 verwendet werden.
 
 ## Änderungshistorie
 
@@ -184,7 +184,7 @@ Detaileinstellungen erfolgen dann auf passenden Unterseiten, benannt nach der je
 Auswahl der angeschlossenen Fingerprint-Scanner-Hardware. Es wird die folgendes angeboten:
 
 * **Kein Fingerprint**: Wenn keine Fingerprint-Hardware angeschlossen ist
-* **R503** (Standard): Fingerprint-Sensor mit Speicherplatz für 200 Finger
+* **R503/R502** (Standard): Fingerprint-Sensor mit Speicherplatz für 200 Finger
 * **R503S**: Fingerprint-Sensor mit Speicherplatz für 150 Finger
 * **R503Pro**: Fingerprint-Sensor mit Speicherplatz für 1500 Finger
 
