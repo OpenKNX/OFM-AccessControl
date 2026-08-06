@@ -1,6 +1,6 @@
 ﻿### Fingerprint Scanner
 
-Auswahl der angeschlossenen Fingerprint-Scanner-Hardware. Es wird die folgendes angeboten:
+Auswahl der angeschlossenen Fingerprint-Scanner-Hardware. Es wird dir folgendes angeboten:
 
 * **Kein Fingerprint**: Wenn keine Fingerprint-Hardware angeschlossen ist
 * **R503** (Standard): Fingerprint-Sensor mit Speicherplatz für 200 Finger
