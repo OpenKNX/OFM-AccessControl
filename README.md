@@ -22,7 +22,8 @@ retains the existing zero-filled credential record format on both platforms.
 Define `OPENKNX_ACC_DISABLE_LEGACY_NFC` and configure PlatformIO
 `lib_ignore = PN7160` when another module will own NFC or no reader is present.
 This excludes the legacy PN7160 headers, initialization, polling and diagnostic
-wait; reader enrollment requests fail without changing stored records. Existing
+wait; reader enrollment requests fail without changing stored records unless
+`OPENKNX_HOMEKEY_ENABLED` selects the guarded external backend. Existing
 NFC IDs, ETS actions and synchronization remain available. This flag does not
 implement a replacement NFC reader or Apple Home Key authentication.
 
@@ -65,3 +66,18 @@ The checks run the actual Fingerprint and GPIO adapter code against instrumented
 hardware dependencies. They verify that missing devices perform no I/O, scanner
 operations cannot succeed without hardware, GPIO 0 remains valid, and expander
 IDs are preserved.
+
+## Home Key adapter (ESP32 prototype)
+
+With both `OPENKNX_HOMEKEY_ENABLED` and `ARDUINO_ARCH_ESP32`, `HomeKeyModule`
+is the only friend allowed to submit authenticated logical IDs or conventional
+UIDs. Calls run on the OpenKNX thread and reuse the existing action, scan status
+and synchronization path. Authentication and issuer/endpoint mapping belong to
+OFM-HomeKey, never to the 10-byte UID database. Mapped IDs must have empty UID
+records; enrollment and UID lookup cannot use IDs reserved for Home Key.
+No public command or KNX object can inject an authenticated Home Key result.
+
+Use `OPENKNX_ACC_DISABLE_LEGACY_NFC` and `lib_ignore = PN7160` for this backend;
+OFM-HomeKey owns the reader. Ordinary tag enrollment remains available through
+that owner when allowed in ETS. RP2040 and the legacy ESP32 PN7160 targets do
+not compile this adapter and retain their reader paths.

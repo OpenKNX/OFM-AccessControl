@@ -1087,7 +1087,7 @@ void AccessControl::processInputKoEnrollFinger(GroupObject &ko)
 
 void AccessControl::processInputKoEnrollNfc(GroupObject &ko)
 {
-#ifdef OPENKNX_ACC_DISABLE_LEGACY_NFC
+#if defined(OPENKNX_ACC_DISABLE_LEGACY_NFC) && !defined(OPENKNX_HOMEKEY_ENABLED)
     logInfoP("NFC enrollment unavailable: legacy reader disabled.");
     return;
 #endif
@@ -2204,7 +2204,7 @@ void AccessControl::handleFunctionPropertySetFingerPassword(uint8_t *data, uint8
 
 void AccessControl::handleFunctionPropertyEnrollNfc(uint8_t *data, uint8_t *resultData, uint8_t &resultLength)
 {
-#ifdef OPENKNX_ACC_DISABLE_LEGACY_NFC
+#if defined(OPENKNX_ACC_DISABLE_LEGACY_NFC) && !defined(OPENKNX_HOMEKEY_ENABLED)
     resultData[0] = 1;
     resultLength = 1;
     return;
@@ -2968,3 +2968,78 @@ AccessControl openknxAccessControl;
 // {
 //     return 10;
 // }
+#if defined(OPENKNX_HOMEKEY_ENABLED) && defined(ARDUINO_ARCH_ESP32)
+bool AccessControl::homeKeyAccessIdAvailable(uint16_t id)
+{
+    if (!knx.configured() || id >= MAX_NFCS || (enrollNfcStarted && enrollNfcId == id))
+        return false;
+    uint8_t stored[10] = {};
+    _nfcStorage.read(ACC_CalcNfcStorageOffset(id), stored, sizeof(stored));
+    for (auto byte : stored)
+        if (byte != 0) return false;
+    return true;
+}
+
+bool AccessControl::processHomeKeyCredential(uint16_t id)
+{
+    // Called only by HomeKeyModule on the OpenKNX thread after DDK + mapping checks.
+    if (isLocked || delayCallbackActive || !homeKeyAccessIdAvailable(id))
+        return false;
+    processNfcScanSuccess(id, true);
+    return true;
+}
+
+void AccessControl::rejectExternalCredential()
+{
+    if (!knx.configured()) return;
+    KoACC_NfcScanSuccess.value(false, DPT_Switch);
+    sendScanAccessData(SyncType::NFC, false);
+    for (uint16_t i = 0; i < ParamACC_VisibleActions; ++i)
+        _channels[i]->resetActionCall();
+}
+
+bool AccessControl::processExternalNfcUid(const uint8_t* uid, uint8_t length, const uint16_t* reserved, size_t count)
+{
+    if (!knx.configured() || isLocked || delayCallbackActive || ParamACC_NfcScanner == 0 ||
+        !uid || (length != 4 && length != 7 && length != 10))
+        return false;
+    uint8_t padded[10] = {};
+    memcpy(padded, uid, length);
+    bool nonempty = false;
+    for (auto byte : padded) nonempty |= byte != 0;
+    if (!nonempty) return false; // Zero-filled records represent empty credential slots.
+    uint16_t found = ACC_ID_INVALID;
+    for (uint16_t i = 0; i < MAX_NFCS; ++i)
+    {
+        uint8_t stored[10] = {};
+        _nfcStorage.read(ACC_CalcNfcStorageOffset(i), stored, sizeof(stored));
+        if (!memcmp(stored, padded, sizeof(stored))) { found = i; break; }
+    }
+    // Home Key mappings reserve IDs for cryptographically authenticated endpoints.
+    for (size_t i = 0; i < count; ++i)
+        if ((enrollNfcStarted && reserved[i] == enrollNfcId) || reserved[i] == found) return false;
+    if (enrollNfcStarted)
+    {
+        if (enrollNfcId >= MAX_NFCS) return false;
+        enrollNfcDuplicateId = found;
+        if (found == ACC_ID_INVALID)
+        {
+            _nfcStorage.write(ACC_CalcNfcStorageOffset(enrollNfcId), padded, sizeof(padded));
+            _nfcStorage.commit();
+            switchLedGreenPower(true);
+        }
+        else
+            switchLedRedPower(true);
+        resetTouchPcbLedTimer = delayTimerInit();
+        enrollNfcStarted = 0;
+        return found == ACC_ID_INVALID;
+    }
+    if (found != ACC_ID_INVALID)
+    {
+        processNfcScanSuccess(found, true);
+        return true;
+    }
+    rejectExternalCredential();
+    return false;
+}
+#endif
