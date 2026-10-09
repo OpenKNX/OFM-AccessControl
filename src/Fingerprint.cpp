@@ -1,13 +1,21 @@
 #include "Fingerprint.h"
 
 Fingerprint::Fingerprint(uint32_t overridePassword)
+#ifdef SCANNER_SERIAL
     : _finger(Adafruit_Fingerprint(&SCANNER_SERIAL, overridePassword))
+#else
+    : _finger(Adafruit_Fingerprint(static_cast<Stream *>(nullptr), overridePassword))
+#endif
 {
     _delayMs = _delayCallbackDefault;
 }
 
 Fingerprint::Fingerprint(DelayCalback delayCallback, uint32_t overridePassword)
+#ifdef SCANNER_SERIAL
     : _finger(Adafruit_Fingerprint(&SCANNER_SERIAL, overridePassword))
+#else
+    : _finger(Adafruit_Fingerprint(static_cast<Stream *>(nullptr), overridePassword))
+#endif
 {
     _delayMs = delayCallback;
 }
@@ -16,6 +24,9 @@ bool Fingerprint::start()
 {
     scannerReady = false;
 
+#ifndef SCANNER_SERIAL
+    return false;
+#else
     _finger.begin(57600, SCANNER_SERIAL_RX_PIN, SCANNER_SERIAL_TX_PIN);
 
     // uint32_t timeoutTimer = delayTimerInit();
@@ -39,10 +50,14 @@ bool Fingerprint::start()
 
     scannerReady = true;
     return true;
+#endif
 }
 
 void Fingerprint::logSystemParameters()
 {
+    if (!scannerReady)
+        return;
+
     logInfoP("System parameters:");
     logIndentUp();
     logInfoP("Status register: %d", _finger.status_reg);
@@ -61,7 +76,9 @@ void Fingerprint::logSystemParameters()
 
 void Fingerprint::close()
 {
+#ifdef SCANNER_SERIAL
     _finger.close();
+#endif
     scannerReady = false;
 }
 
@@ -107,6 +124,9 @@ bool Fingerprint::setLed(State state)
 
 bool Fingerprint::setLed(uint8_t color, uint8_t control, uint8_t speed, uint8_t count)
 {
+    if (!scannerReady)
+        return false;
+
     return _finger.LEDcontrol(control, speed, color, count) == FINGERPRINT_OK;
 }
 
@@ -132,6 +152,9 @@ uint16_t Fingerprint::getTemplateCount()
 
 bool Fingerprint::_listTemplates()
 {
+    if (!scannerReady)
+        return false;
+
     uint8_t p = _finger.getTemplateIndices();
     if (p == FINGERPRINT_OK)
     {
@@ -448,6 +471,9 @@ bool Fingerprint::createTemplate()
 
 bool Fingerprint::retrieveTemplate(uint8_t templateData[])
 {
+    if (!scannerReady)
+        return false;
+
     logDebugP("Receive template:");
     logIndentUp();
     uint8_t p = _finger.get_template_buffer(TEMPLATE_SIZE, templateData);
@@ -459,6 +485,9 @@ bool Fingerprint::retrieveTemplate(uint8_t templateData[])
 
 bool Fingerprint::sendTemplate(uint8_t templateData[])
 {
+    if (!scannerReady)
+        return false;
+
     logDebugP("Send template:");
     logIndentUp();
     uint8_t p = _finger.write_template_to_sensor(TEMPLATE_SIZE, templateData);
@@ -472,6 +501,9 @@ bool Fingerprint::sendTemplate(uint8_t templateData[])
 #ifdef CALC_TEMPLATE_CHECKUM
 bool Fingerprint::writeCrc(uint16_t location, uint8_t *templateData, uint32_t secret)
 {
+    if (!scannerReady)
+        return false;
+
     logDebugP("Calculate and store CRC:");
     logIndentUp();
 

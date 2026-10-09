@@ -1,4 +1,6 @@
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+    #define _GNU_SOURCE
+#endif
 
 #include "OpenKNX.h"
 #include "hardware.h"
@@ -7,9 +9,13 @@
 #include "ActionChannel.h"
 #include "FastCRC.h"
 #include "lz4.h"
+#include "AccessControlHardware.h"
+
+#ifndef OPENKNX_ACC_DISABLE_LEGACY_NFC
 #include "pn7160interface/pn7160interface.hpp"
 #include "logging/logging.hpp"
 #include "nci/nci.hpp"
+#endif
 
 #define INIT_RESET_TIMEOUT 1000
 #define LED_RESET_TIMEOUT 1000
