@@ -21,7 +21,11 @@ void KeypadForGira::init(bool testMode)
     // clock-stretches and ignores I2C; without this the loop blocks ~2 s per poll (one timeout
     // for the register-pointer write, one for the read). 20 ms is ample for a real transaction
     // and keeps us well under OPENKNX_LOOPTIME_WARNING. reset_with_timeout=true recovers the bus.
+#ifdef ARDUINO_ARCH_ESP32
+    OPENKNX_GPIO_WIRE.setTimeOut(20);
+#else
     OPENKNX_GPIO_WIRE.setTimeout(20, true);
+#endif
 
     // The BS8116A is limited to 100 kHz; talk to it at that speed, then restore the global speed.
     OPENKNX_GPIO_WIRE.setClock(BS8116_I2C_CLOCK);
@@ -81,9 +85,18 @@ void KeypadForGira::loop(bool testMode)
     // and clock-stretching, so polling fast is pointless: back off to the standby interval. As
     // soon as a read succeeds (chip awake) we return to the fast interval. The chip's own
     // wake-from-standby latency is 0.5-1 s, so the slower idle poll costs no real responsiveness.
+#ifndef ARDUINO_ARCH_ESP32
     OPENKNX_GPIO_WIRE.clearTimeoutFlag();
+#endif
     uint16_t keymap = _keypad.readKeys();
+#ifdef ARDUINO_ARCH_ESP32
+    // ESP32 Wire has no sticky timeout flag. Probe ACK after the read to back off
+    // while the BS8116 is asleep or disconnected, keeping every transaction bounded.
+    OPENKNX_GPIO_WIRE.beginTransmission(BS811X_LSF);
+    _readKeysInterval = OPENKNX_GPIO_WIRE.endTransmission() != 0 ? READ_KEYS_INTERVAL_STANDBY : READ_KEYS_INTERVAL;
+#else
     _readKeysInterval = OPENKNX_GPIO_WIRE.getTimeoutFlag() ? READ_KEYS_INTERVAL_STANDBY : READ_KEYS_INTERVAL;
+#endif
 
     OPENKNX_GPIO_WIRE.setClock(OPENKNX_GPIO_CLOCK); // restore global bus speed
 

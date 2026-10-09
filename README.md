@@ -31,8 +31,24 @@ use a scanner (ESP32 supports HardwareSerial). Touch and LED pins omitted from
 the board configuration default to -1; GPIO and interrupt operations skip those
 pins. Existing real pins, including GPIO 0 and expander IDs, remain usable.
 
-The XIAO ESP32-S3 compile target in OAM-AccessControl uses these options. Hardware
-boot, KNX traffic and reader operation still require device validation.
+The XIAO ESP32-S3 target in OAM-AccessControl now enables PN7160 I2C on ESP32,
+using the separately versioned local PN7160 transport port. Its NCI polling, UID
+enrollment/lookup, ETS actions and KNX synchronization use the same module code
+as RP2040. Do not define `OPENKNX_ACC_DISABLE_LEGACY_NFC` for this target.
+
+On ESP32, configure `OPENKNX_GPIO_WIRE`, `OPENKNX_GPIO_SDA`, `OPENKNX_GPIO_SCL`,
+`OPENKNX_GPIO_CLOCK`, `NFC_IRQ_PIN`, `NFC_VEN_PIN` and `NFC_PN7160_ADDR`.
+The reader checks bus initialization and resets NCI before discovery. The
+RP2040 reader initialization and polling path retain their existing behavior.
+
+The Gira keypad uses ESP32 Wire's `setTimeOut` API and backs off on failed ACKs;
+RP2040 retains its sticky-timeout recovery. Direct touch inputs on I2C expanders
+are polled on ESP32 instead of registering expander IDs as MCU interrupts.
+Fingerprint UART, matrix keypad, LED controllers, action channels and credential
+storage are available on both architectures when the board maps their hardware.
+The application includes a separate peripheral compile profile to check these
+paths together. Hardware boot, KNX traffic and reader operation still require
+device validation.
 
 Native port regression checks (requires a C++17 compiler):
 

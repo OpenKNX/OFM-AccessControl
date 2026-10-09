@@ -147,7 +147,17 @@ void AccessControl::initNfc(bool testMode, uint8_t testModeNfc)
         AccessControlHardware::digitalWrite(0x0201, LOW);
     }
 
+#ifdef ARDUINO_ARCH_ESP32
+    if (!PN7160Interface::initialize(OPENKNX_GPIO_WIRE, NFC_IRQ_PIN, NFC_VEN_PIN,
+                                   NFC_PN7160_ADDR, OPENKNX_GPIO_SDA, OPENKNX_GPIO_SCL, OPENKNX_GPIO_CLOCK))
+    {
+        logErrorP("PN7160 I2C initialization failed.");
+        return;
+    }
+    nci::reset();
+#else
     PN7160Interface::initialize(NFC_IRQ_PIN, NFC_VEN_PIN, NFC_PN7160_ADDR);
+#endif
     logInfoP("Initialized PN7160 (nfcType=%u).", nfcType);
 #endif
 }
@@ -462,6 +472,13 @@ void AccessControl::loop()
         syncRequestedNfcId = 0;
     }
 
+#ifdef ARDUINO_ARCH_ESP32
+    if (ParamACC_EnableTouchPcb || ParamACC_NfcScanner == 1)
+    {
+        touchLeftTouched = AccessControlHardware::digitalRead(DIRECT_TOUCH_LEFT_PIN) == HIGH;
+        touchRightTouched = AccessControlHardware::digitalRead(DIRECT_TOUCH_RIGHT_PIN) == HIGH;
+    }
+#endif
     if (ParamACC_NfcScanner == 2)
     {
         touchLeftTouched = AccessControlHardware::digitalRead(EXTERN_TOUCH_LEFT_PIN) == HIGH;
@@ -532,6 +549,15 @@ void AccessControl::loopNfc(bool testMode)
             
             uniqueIdLength = nci::tagData.getUniqueIdLength();
             uniqueId = nci::tagData.getUniqueId();
+#ifdef ARDUINO_ARCH_ESP32
+            // A zero-length UID must not match every stored record via memcmp(..., 0).
+            if (uniqueIdLength != 4 && uniqueIdLength != 7 && uniqueIdLength != 10)
+            {
+                logErrorP("Invalid NFC UID length: %u", uniqueIdLength);
+                logIndentDown();
+                break;
+            }
+#endif
 
             logDebugP("uniqueID (length=%d):", uniqueIdLength);
             for (uint8_t index = 0; index < uniqueIdLength; index++)

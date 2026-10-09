@@ -67,5 +67,9 @@ int main()
     assert(openknx.gpio.lastPin == 0x0204);
     AccessControlHardware::attachInterrupt(0, callback, CHANGE);
     assert(interruptCalls == 1 && lastInterruptPin == 0);
+#ifdef ARDUINO_ARCH_ESP32
+    AccessControlHardware::attachInterrupt(0x0104, callback, CHANGE);
+    assert(interruptCalls == 1); // I2C touch inputs are polled, never attached as MCU GPIO.
+#endif
     std::puts("PASS: absent scanner performs no I/O; absent GPIO is skipped; real pin IDs survive.");
 }

@@ -59,6 +59,11 @@ namespace AccessControlHardware
 
     inline void attachInterrupt(int32_t pin, void (*callback)(), decltype(CHANGE) mode)
     {
+#ifdef ARDUINO_ARCH_ESP32
+        // Expander touch inputs are polled in AccessControl::loop on ESP32.
+        if (pin > 0xFF)
+            return;
+#endif
         if (pin >= 0)
             ::attachInterrupt(digitalPinToInterrupt(pin), callback, mode);
     }
