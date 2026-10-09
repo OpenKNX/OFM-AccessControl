@@ -349,7 +349,7 @@
               <ParameterRef Id="%AID%_UP-%T%000062_R-%T%00006201" RefId="%AID%_UP-%T%000062" />
             </ParameterRefs>
            <ParameterCalculations>
-              <ParameterCalculation Id="%AID%_PC-%T%000001" Language="JavaScript" Name="ACC_ClearFieldContent" LRTransformationFunc="LOG_Nop" RLTransformationFunc="LOG_ClearContent" >
+              <ParameterCalculation Id="%AID%_PC-%T%000001" Language="JavaScript" Name="ACC_ClearFieldContent" LRTransformationFunc="BASE_Nop" RLTransformationFunc="LOG_ClearContent" >
                 <LParameters>
                   <ParameterRefRef RefId="%AID%_P-%T%000031_R-%T%00003101" AliasName="ResultDisplay" />
                 </LParameters>

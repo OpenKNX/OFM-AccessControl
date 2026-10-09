@@ -1,6 +1,6 @@
 {
     "name": "OFM-AccessControl",
-    "version": "0.14.2",
+    "version": "0.14.3",
     "description": "Access control library for OpenKNX framework",
     "homepage": "https://openknx.de",
     "authors": {
