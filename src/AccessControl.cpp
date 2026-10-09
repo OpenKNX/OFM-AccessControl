@@ -2812,10 +2812,10 @@ bool AccessControl::processCommand(const std::string cmd, bool diagnoseKo)
 
     if (cmd.length() == 5 && cmd.substr(4, 1) == "h")
     {
-        openknx.console.writeDiagenoseKo("-> pwr on");
-        openknx.console.writeDiagenoseKo("");
-        openknx.console.writeDiagenoseKo("-> pwr off");
-        openknx.console.writeDiagenoseKo("");
+        openknx.console.writeDiagnoseKo("-> pwr on");
+        openknx.console.writeDiagnoseKo("");
+        openknx.console.writeDiagnoseKo("-> pwr off");
+        openknx.console.writeDiagnoseKo("");
     }
 #ifdef SCANNER_PWR_PIN
     else if (cmd.length() == 10 && cmd.substr(4, 6) == "pwr on")
