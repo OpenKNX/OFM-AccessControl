@@ -164,7 +164,7 @@ class AccessControl : public OpenKNX::Module
     void handleFunctionPropertySyncNfc(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertyDeleteNfc(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertyResetNfcScanner(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
-    void handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
+    void handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_t *resultData, uint8_t &resultLength, bool quiet = false);
     void handleFunctionPropertySearchNfcIdByTag(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertyChangeKeypad(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertySyncKeypad(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);

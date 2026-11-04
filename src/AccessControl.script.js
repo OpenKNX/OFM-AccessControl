@@ -596,7 +596,7 @@ function ACC_checkNfcAction(device, online, progress, context) {
         progress.setText("NFC: Zuordnung zu ID " + parNfcId.value + " prüfen...");
         online.connect();
         var id = Number(parNfcId.value);
-        var data = [111, (id >> 8) & 255, id & 255];
+        var data = [111, (id >> 8) & 255, id & 255, 1]; // Quiet UID occupancy probe; Home Key may own the slot.
         var resp = BASE_invokeFunctionPropertyWrapper(160, 3, data, device, online, progress);
         if (!resp || resp.length < 1 || (Number(resp[0]) != 0 && Number(resp[0]) != 1) || (Number(resp[0]) == 0 && resp.length < 11))
             throw new Error("NFC: Ungültige Antwort bei der Tag-Abfrage");

@@ -675,13 +675,18 @@ void AccessControl::processNfcScanSuccess(uint16_t foundId, bool external)
         uint16_t nfcId = knx.paramWord(NFCACT_FaNfcId + NFCACT_ParamBlockOffset + i * NFCACT_ParamBlockSize);
         if (nfcId == foundId)
         {
-            uint16_t actionId = knx.paramWord(NFCACT_FaActionId + NFCACT_ParamBlockOffset + i * NFCACT_ParamBlockSize) - 1;
-            if (actionId < ACC_VisibleActions)
+            const uint16_t configuredAction = knx.paramWord(NFCACT_FaActionId + NFCACT_ParamBlockOffset + i * NFCACT_ParamBlockSize);
+            if (configuredAction == 0) continue; // Empty action row; NFC-Tag-ID 0 is valid.
+            const uint16_t actionId = configuredAction - 1;
+            if (actionId < ACC_VisibleActions && actionId < ParamACC_VisibleActions && _channels[actionId])
                 actionExecuted |= _channels[actionId]->processScan(foundId);
             else
-                logInfoP("Invalid ActionId: %d", actionId);
+                logInfoP("NFC-Tag-ID %u: action %u is not configured", foundId, configuredAction);
         }
     }
+
+    if (external && !actionExecuted)
+        logInfoP("NFC-Tag-ID %u accepted, but no action executed; check ETS NFC assignments, action enable and locks", foundId);
 
     if (actionExecuted)
     {
@@ -1758,7 +1763,7 @@ bool AccessControl::processFunctionProperty(uint8_t objectIndex, uint8_t propert
             handleFunctionPropertyWaitEnrollNfcFinished(data, resultData, resultLength);
             return true;
         case 111:
-            handleFunctionPropertySearchTagByNfcId(data, resultData, resultLength);
+            handleFunctionPropertySearchTagByNfcId(data, resultData, resultLength, length == 4 && data[3] == 1);
             return true;
         case 112:
             handleFunctionPropertySearchNfcIdByTag(data, resultData, resultLength);
@@ -2376,16 +2381,16 @@ void AccessControl::handleFunctionPropertyResetNfcScanner(uint8_t *data, uint8_t
     logIndentDown();
 }
 
-void AccessControl::handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_t *resultData, uint8_t &resultLength)
+void AccessControl::handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_t *resultData, uint8_t &resultLength, bool quiet)
 {
-    logInfoP("Function property NFC: Search NFC-Tag by NfcId");
-    logIndentUp();
+    if (!quiet) logInfoP("Function property NFC: Search NFC-Tag by NfcId");
+    if (!quiet) logIndentUp();
 
     uint16_t nfcId = (data[1] << 8) | data[2];
-    logDebugP("nfcId: %d", nfcId);
+    if (!quiet) logDebugP("nfcId: %d", nfcId);
 
     uint32_t storageOffset = ACC_CalcNfcStorageOffset(nfcId);
-    logDebugP("storageOffset: %d", storageOffset);
+    if (!quiet) logDebugP("storageOffset: %d", storageOffset);
 
     uint8_t emptyTest[10] = {};
     uint8_t tagUid[10] = {};
@@ -2395,12 +2400,12 @@ void AccessControl::handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_
         uint8_t tagName[28] = {};
         _nfcStorage.read(storageOffset + 10, tagName, 28);
 
-        logDebugP("Found:");
-        logIndentUp();
-        logDebugP("tagUid:");
-        logHexDebugP(tagUid, 10);
-        logDebugP("tagName: %s", tagName);
-        logIndentDown();
+        if (!quiet) logDebugP("Found:");
+        if (!quiet) logIndentUp();
+        if (!quiet) logDebugP("tagUid:");
+        if (!quiet) logHexDebugP(tagUid, 10);
+        if (!quiet) logDebugP("tagName: %s", tagName);
+        if (!quiet) logIndentDown();
 
         resultData[0] = 0;
         memcpy(resultData + 1, tagUid, 10);
@@ -2416,13 +2421,13 @@ void AccessControl::handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_
     }
     else
     {
-        logDebugP("Not found.");
+        if (!quiet) logDebugP("Not found.");
 
         resultData[0] = 1;
         resultLength = 1;
     }
 
-    logIndentDown();
+    if (!quiet) logIndentDown();
 }
 
 void AccessControl::handleFunctionPropertySearchNfcIdByTag(uint8_t *data, uint8_t *resultData, uint8_t &resultLength)
