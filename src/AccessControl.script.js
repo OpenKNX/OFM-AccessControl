@@ -588,40 +588,35 @@ function ACC_checkNfcAction(device, online, progress, context) {
     var parNfcId = device.getParameterByName("NFCACT_Fa" + context.Channel + "NfcId");
     var parNfcActionInfo = device.getParameterByName("NFCACT_Fa" + context.Channel + "NfcActionInfo");
     var parVisibleActions = device.getParameterByName("ACC_VisibleActions");
-
-    if (parActionId.value <= parVisibleActions.value) {
-
-        progress.setText("NFC: Tag zu NFC ID " + parNfcId.value + " suchen...");
-        online.connect();
-    
-        var data = [111]; // internal function ID
-        data = data.concat((parNfcId.value & 0x0000ff00) >> 8, (parNfcId.value & 0x000000ff));
-
-        var nfcName = "";
-
-        // var resp = online.invokeFunctionProperty(160, 3, data);
-        var resp = BASE_invokeFunctionPropertyWrapper(160, 3, data, device, online, progress);
-        if (resp[0] != 0) {
-            progress.setText("NFC: Tag zu NFC ID " + parNfcId.value + " nicht gefunden.");
-            online.disconnect();
-            return;
-        } else {
-            online.disconnect();
-            progress.setText("NFC: Tag zu NFC ID " + parNfcId.value + " gefunden.");
-        
-            personNfc = resp[1];
-            for (var i = 11; i < resp.length; ++i) {
-                if (resp[i] == 0)
-                    break; // null-termination
-            
-                nfcName += String.fromCharCode(resp[i]);
-            }
-        }
-
-        var parActionDescription = device.getParameterByName("ACC_Act" + parActionId.value + "Description");
-        parNfcActionInfo.value = (parActionDescription.value + "; " + nfcName).substring(0, 80);
-    } else {
+    if (Number(parActionId.value) < 1 || Number(parActionId.value) > Number(parVisibleActions.value)) {
         parNfcActionInfo.value = "Aktion ist nicht definiert, NFC wurde nicht ermittelt";
+        return;
+    }
+    try {
+        progress.setText("NFC: Zuordnung zu ID " + parNfcId.value + " prüfen...");
+        online.connect();
+        var id = Number(parNfcId.value);
+        var data = [111, (id >> 8) & 255, id & 255];
+        var resp = BASE_invokeFunctionPropertyWrapper(160, 3, data, device, online, progress);
+        if (!resp || resp.length < 1 || (Number(resp[0]) != 0 && Number(resp[0]) != 1) || (Number(resp[0]) == 0 && resp.length < 11))
+            throw new Error("NFC: Ungültige Antwort bei der Tag-Abfrage");
+        var found = Number(resp[0]) == 0, nfcName = "";
+        if (found) {
+            for (var i = 11; i < resp.length && resp[i] != 0; i++) nfcName += String.fromCharCode(resp[i]);
+        }
+        var info = typeof HK_nfcAssignmentInfo == "function"
+            ? HK_nfcAssignmentInfo(device, online, progress, id, found) : null;
+        if (info === null) info = found ? "UID-Tag: " + (nfcName || "ID " + id) : "Kein UID-Tag / keine aktive ETS-Home-Key-Zuordnung für ID " + id;
+        var description = device.getParameterByName("ACC_Act" + parActionId.value + "Description");
+        // Put warnings before the action description so they survive the field's 80-character limit.
+        var text = info + "; Aktion " + parActionId.value + ": " + description.value;
+        parNfcActionInfo.value = text.substring(0, 80);
+        progress.setText(text);
+    } catch (error) {
+        parNfcActionInfo.value = ("Abfrage fehlgeschlagen: " + error.message).substring(0, 80);
+        throw error;
+    } finally {
+        try { online.disconnect(); } catch (ignored) { }
     }
 }
 
