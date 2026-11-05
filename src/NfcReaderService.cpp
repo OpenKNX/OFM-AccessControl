@@ -15,6 +15,7 @@ NfcReaderService openknxNfc;
 
 void NfcReaderService::setup() {
     if (!reader) createReader();
+    uid.reserve(10);
 #ifdef ARDUINO_ARCH_ESP32
     if (!events) events = xQueueCreate(4, sizeof(Event));
     if (!events) { failed = true; logError("NFC", "Reader event queue allocation failed"); }
@@ -25,10 +26,10 @@ void NfcReaderService::loop() {
 #if defined(HK_Enabled)
     // A UID-only image cannot honor an enabled HomeKey policy. Require the
     // matching ETS mode rather than silently weakening that configuration.
-    const bool unsupported = ParamHK_Enabled && (!extension || !reader->capabilities().homeKey());
+    const bool unsupported = knx.configured() && ParamHK_Enabled && (!extension || !reader->capabilities().homeKey());
     if (requested && !testing && unsupported && !policyBlocked)
         logWarning("NFC", "HomeKey requested but reader or firmware lacks ISO-DEP/ECP support; scanning disabled");
-    policyBlocked = unsupported;
+    policyBlocked = requested && !testing && unsupported;
     requested = requested && (testing || !unsupported);
 #endif
     if (!requested) { if (running) suspend(); return; }
@@ -113,6 +114,16 @@ void NfcReaderService::createReader() {
     reader=std::make_unique<Pn7161ReaderAdapter>(config,ecp);
 #endif
 }
+bool NfcReaderService::readerHealthy() {
+    // Transport errors remain immediately visible. Active register/NCI probes
+    // are periodic, including while a phone is held against the antenna.
+    if (healthFailed || !reader->isConnected()) return false;
+    const uint32_t now=millis();
+    if (uint32_t(now-lastHealthCheck)<10000) return true;
+    lastHealthCheck=now;
+    healthFailed=!reader->healthCheck();
+    return !healthFailed;
+}
 bool NfcReaderService::receive(Event& event) {
 #ifdef ARDUINO_ARCH_ESP32
     return events && xQueueReceive(events,&event,0)==pdTRUE;
@@ -145,17 +156,21 @@ void NfcReaderService::run() {
         if (connected && appliedEpoch!=scanEpoch) { reader->stop();connected=false; }
         if (!connected) {
             presentation.reset();
-            connected=reader->init() && reader->beginDiscovery();
+            connected=reader->init() && reader->beginDiscovery() && reader->healthCheck();
+            lastHealthCheck=millis();healthFailed=false;
             announced=connected&&reader->discoveryReady();
             if(announced)send(Kind::Ready,scanEpoch);
             if(!connected)send(Kind::Failed,scanEpoch);
             if (!connected) { reader->stop();vTaskDelay(pdMS_TO_TICKS(5000));continue; }
             appliedEcp=ecp;appliedEpoch=scanEpoch;
         } else if (ecp!=appliedEcp) {
-            if (!reader->updateECP()) { reader->stop();connected=false;continue; }
+            if (!reader->updateECP()) {
+                reader->stop();connected=false;send(Kind::Failed,scanEpoch);
+                vTaskDelay(pdMS_TO_TICKS(5000));continue;
+            }
             appliedEcp=ecp;
         }
-        std::vector<uint8_t> uid;std::array<uint8_t,2> atqa{};uint8_t sak=0;
+        std::array<uint8_t,2> atqa{};uint8_t sak=0;
         const auto result=reader->pollTag(uid,atqa,sak,250);
         if (result==NfcPollResult::ReaderError) {
             reader->stop();connected=false;send(Kind::Failed,scanEpoch);
@@ -172,14 +187,14 @@ void NfcReaderService::run() {
             // seconds: that would re-trigger access while the phone stays put.
             while (running && scanEpoch==epoch && reader->isTagStillPresent()) {
                 presentation.seen(millis());
-                if (!reader->healthCheck()) break;
+                if (!readerHealthy()) break;
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
             presentation.seen(millis());
             reader->releaseTag();
         }
         if (!found) presentation.absent(millis());
-        if (!reader->healthCheck()) {
+        if (!readerHealthy()) {
             reader->stop();connected=false;send(Kind::Failed,scanEpoch);
             vTaskDelay(pdMS_TO_TICKS(5000));continue;
         }
@@ -194,16 +209,17 @@ void NfcReaderService::pollCooperative() {
     cooperativeRetry=false;
     if(!cooperativeConnected){
         ecp.fill(0);presentation.reset();
-        cooperativeConnected=reader->init()&&reader->beginDiscovery();
+        cooperativeConnected=reader->init()&&reader->beginDiscovery()&&reader->healthCheck();
+        lastHealthCheck=millis();healthFailed=false;
         cooperativeAnnounced=false;
         if(!cooperativeConnected){reader->stop();cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,epoch);return;}
     }
     uint32_t token=0;
     std::array<uint8_t,18> desired{};
     if(extension && !extension->prepareNfc(desired,token))return;
-    if(desired!=ecp){ecp=desired;if(!reader->updateECP()){reader->stop();cooperativeConnected=false;return;}}
+    if(desired!=ecp){ecp=desired;if(!reader->updateECP()){reader->stop();cooperativeConnected=false;cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,epoch);return;}}
     const uint32_t scanEpoch=epoch;
-    std::vector<uint8_t> uid;std::array<uint8_t,2> atqa{};uint8_t sak=0;
+    std::array<uint8_t,2> atqa{};uint8_t sak=0;
     const auto result=reader->pollTag(uid,atqa,sak,0);
     if(result==NfcPollResult::ReaderError){
         reader->stop();cooperativeConnected=false;cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,scanEpoch);return;
@@ -214,7 +230,7 @@ void NfcReaderService::pollCooperative() {
         if(presentation.accept(uid,millis())){send(Kind::Detected,scanEpoch);routeTag(scanEpoch,token,uid,sak);}
         reader->releaseTag();
     } else if(!found) presentation.absent(millis());
-    if(!reader->healthCheck()){
+    if(!readerHealthy()){
         reader->stop();cooperativeConnected=false;cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,scanEpoch);
     }
 }

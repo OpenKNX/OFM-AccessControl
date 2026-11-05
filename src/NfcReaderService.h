@@ -55,6 +55,7 @@ private:
     enum class Kind : uint8_t { Ready, Failed, Detected, Uid };
     struct Event { Kind kind; uint32_t epoch, token; uint8_t uid[10] = {}; uint8_t length = 0; };
     void createReader();
+    bool readerHealthy();
     void routeTag(uint32_t epoch,uint32_t token,const std::vector<uint8_t>& uid,uint8_t sak);
     bool receive(Event&);
 #ifdef ARDUINO_ARCH_ESP32
@@ -86,6 +87,9 @@ private:
     std::array<uint8_t,18> ecp{};
     std::unique_ptr<INfcReader> reader;
     NfcPresentation presentation;
+    std::vector<uint8_t> uid; // Reused by the sole reader worker/cooperative poller.
+    uint32_t lastHealthCheck = 0;
+    bool healthFailed = false;
 };
 extern NfcReaderService openknxNfc;
 #endif
