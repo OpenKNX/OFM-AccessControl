@@ -83,21 +83,34 @@ that owner when allowed in ETS. RP2040 and the legacy ESP32 PN7160 targets do
 not compile this adapter and retain their reader paths.
 
 
-## Shared ESP32 NFC reader service
+## Shared NFC reader service
 
-`OPENKNX_ACC_NFC_READER` selects the generic `NfcReaderService` instead of the
-legacy PN7160 loop. The service owns its RTOS task/queue and reader instance;
+All reader backends now use `NfcReaderService`. Existing PN7160 applications
+automatically select it through `NfcReaderConfig.h`; explicit PN7161/ST25 profiles
+set `OPENKNX_ACC_NFC_READER`. The service owns its RTOS task/queue and reader instance;
 UID enrollment and actions reuse the existing NFC storage and main-thread path.
 ETS download/restart suspends scanning and invalidates queued results with an
 epoch. Queue overflow and initialization/task failures cannot grant access.
-The legacy PN7160 path and non-ESP32 targets are unchanged.
+ESP32 executes the reader on the NFC task. RP2040 advances the PN7160 backend
+cooperatively with a fixed event ring and no FreeRTOS dependency. The original
+PN7160 NCI state machine and front-panel/expander setup are retained.
 
 An optional `NfcReaderExtension` supplies ECP bytes, readiness, tag authentication
 and main-thread UID policy checks. It contains no HomeKey types. No extension
 means ordinary UID scanning with zero ECP. A tag consumed by an extension can
-never enter the UID fallback path. The PN7161 and ST25R3916 hardware drivers live
+never enter the UID fallback path. The PN7160, PN7161 and ST25R3916 hardware drivers live
 in their independent libraries; the adapters here implement `INfcReader`.
 
 `OPENKNX_NFC_UID_ONLY` images require HomeKey disabled in ETS when the application
 has that parameter. The application provides REG1 PN7161 and ST25R3916 UID-only
 IP environments that exclude OFM-HomeKey, HomeSpan and DigitalDoorKey.
+
+
+PN7160 uses `Pn7160ReaderAdapter` and the standalone `PN7160Reader` facade.
+Discovery readiness is asynchronous; the ready log is emitted only after NCI
+reaches discovery. UID matching, enrollment, lock/delay checks and action
+delivery use the same path as PN7161/ST25. The PN7160 hardware-test mode sets a
+separate diagnostic flag: detected tags can neither enroll nor grant access.
+The legacy PN7160 backend intentionally exposes no APDU or ECP API; HomeKey
+remains supported only by the PN7161/ST25 adapters. Reset/error recovery clears
+cached UIDs and backs off before retrying, without ending the shared I2C bus.

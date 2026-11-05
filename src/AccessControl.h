@@ -4,6 +4,7 @@
 
 #include "OpenKNX.h"
 #include "hardware.h"
+#include "NfcReaderConfig.h"
 #include "Fingerprint.h"
 #include "KeypadBase.h"
 #include "ActionChannel.h"
@@ -11,11 +12,7 @@
 #include "lz4.h"
 #include "AccessControlHardware.h"
 
-#ifndef OPENKNX_ACC_DISABLE_LEGACY_NFC
-#include "pn7160interface/pn7160interface.hpp"
-#include "logging/logging.hpp"
-#include "nci/nci.hpp"
-#endif
+
 
 #define INIT_RESET_TIMEOUT 1000
 #define LED_RESET_TIMEOUT 1000
@@ -91,7 +88,7 @@ class AccessControl : public OpenKNX::Module
     // uint16_t flashSize() override;
 
   private:
-#if (defined(OPENKNX_HOMEKEY_ENABLED) || defined(OPENKNX_ACC_NFC_READER)) && defined(ARDUINO_ARCH_ESP32)
+#if defined(OPENKNX_HOMEKEY_ENABLED) || defined(OPENKNX_ACC_NFC_READER)
     friend class HomeKeyModule;
     friend class NfcReaderService;
     bool homeKeyAccessIdAvailable(uint16_t id);

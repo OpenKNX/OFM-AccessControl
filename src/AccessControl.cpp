@@ -120,50 +120,20 @@ void AccessControl::dispatchAuthAction(bool started) {
 void AccessControl::initNfc(bool testMode, uint8_t testModeNfc)
 {
 #ifdef OPENKNX_ACC_NFC_READER
+#if defined(OPENKNX_NFC_PN7160) && defined(OPENKNX_GPIO_NUM) && OPENKNX_GPIO_NUM >= 2
+    const uint8_t nfcType=testMode ? testModeNfc : ParamACC_NfcScanner;
+    if(nfcType==2){
+        // Preserve the external PN7160 front-panel/expander setup.
+        AccessControlHardware::pinMode(0x0200,OUTPUT);
+        AccessControlHardware::digitalWrite(0x0200,LOW);
+        AccessControlHardware::pinMode(0x0201,OUTPUT);
+        AccessControlHardware::digitalWrite(0x0201,LOW);
+    }
+#endif
     openknxNfc.setup();
-#elif defined(OPENKNX_ACC_DISABLE_LEGACY_NFC)
-    logInfoP("Legacy NFC reader disabled for this target.");
+    if(testMode)openknxNfc.beginTest();
 #else
-    if (!testMode &&
-        ParamACC_NfcScanner == 0)
-        return;
-
-#ifdef NCI_DEBUG
-    logging::initialize();
-    logging::enable(logging::destination::destUart1);
-
-    delay(1000); // delay required to get debug serial ready
-
-    logging::enable(logging::source::criticalError);
-    logging::enable(logging::source::nciMessages);
-    logging::enable(logging::source::stateChanges);
-    logging::enable(logging::source::tagEvents);
-#endif
-
-    uint8_t nfcType =
-        (!testMode && ParamACC_NfcScanner == 2 ||
-         testMode && testModeNfc == 2) ? 2 : 1;
-
-    if (nfcType == 2)
-    {
-        AccessControlHardware::pinMode(0x0200, OUTPUT);
-        AccessControlHardware::digitalWrite(0x0200, LOW);
-        AccessControlHardware::pinMode(0x0201, OUTPUT);
-        AccessControlHardware::digitalWrite(0x0201, LOW);
-    }
-
-#ifdef ARDUINO_ARCH_ESP32
-    if (!PN7160Interface::initialize(OPENKNX_GPIO_WIRE, NFC_IRQ_PIN, NFC_VEN_PIN,
-                                   NFC_PN7160_ADDR, OPENKNX_GPIO_SDA, OPENKNX_GPIO_SCL, OPENKNX_GPIO_CLOCK))
-    {
-        logErrorP("PN7160 I2C initialization failed.");
-        return;
-    }
-    nci::reset();
-#else
-    PN7160Interface::initialize(NFC_IRQ_PIN, NFC_VEN_PIN, NFC_PN7160_ADDR);
-#endif
-    logInfoP("Initialized PN7160 (nfcType=%u).", nfcType);
+    logInfoP("NFC reader disabled for this target.");
 #endif
 }
 
@@ -546,129 +516,8 @@ void AccessControl::loopNfc(bool testMode)
         }
     }
 
-#ifndef OPENKNX_ACC_DISABLE_LEGACY_NFC
-    nci::run();
-
-    uint8_t uniqueIdLength;
-    const uint8_t* uniqueId;
-    tagStatus currentTagStatus = nci::getTagStatus();
-    switch (currentTagStatus) {
-        case tagStatus::foundNew:
-            logDebugP("New tag detected:");
-            logIndentUp();
-            
-            uniqueIdLength = nci::tagData.getUniqueIdLength();
-            uniqueId = nci::tagData.getUniqueId();
-#ifdef ARDUINO_ARCH_ESP32
-            // A zero-length UID must not match every stored record via memcmp(..., 0).
-            if (uniqueIdLength != 4 && uniqueIdLength != 7 && uniqueIdLength != 10)
-            {
-                logErrorP("Invalid NFC UID length: %u", uniqueIdLength);
-                logIndentDown();
-                break;
-            }
-#endif
-
-            logDebugP("uniqueID (length=%d):", uniqueIdLength);
-            for (uint8_t index = 0; index < uniqueIdLength; index++)
-                logDebugP("0x%02X ", uniqueId[index]);
-
-            if (!testMode)
-            {
-                if (enrollNfcStarted > 0)
-                {
-                    uint32_t storageOffset = 0;
-                    uint8_t tagUid[10] = {};
-                    for (uint16_t i = 0; i < MAX_NFCS; i++)
-                    {
-                        storageOffset = ACC_CalcNfcStorageOffset(i);
-                        _nfcStorage.read(storageOffset, tagUid, 10);
-                        if (!memcmp(tagUid, uniqueId, 10))
-                        {
-                            enrollNfcDuplicateId = i;
-                            logInfoP("Not enrolled as unique tag ID already present in nfcID %u.", enrollNfcDuplicateId);
-                            break;
-                        }
-                    }
-
-                    if (enrollNfcDuplicateId == ACC_ID_INVALID)
-                    {
-                        storageOffset = ACC_CalcNfcStorageOffset(enrollNfcId);
-                        logDebugP("storageOffset: %d", storageOffset);
-                        _nfcStorage.write(storageOffset, const_cast<uint8_t*>(uniqueId), uniqueIdLength);
-                        _nfcStorage.commit();
-
-                        logInfoP("Enrolled to nfcID %u.", enrollNfcId);
-                
-                        //###ToDo: remote management status feedback
-
-                        switchLedGreenPower(true);
-                    }
-                    else
-                    {
-                        //###ToDo: remote management status feedback
-
-                        switchLedRedPower(true);
-                    }
-
-                    resetTouchPcbLedTimer = delayTimerInit();
-                    enrollNfcStarted = 0;
-                }
-                else
-                {
-                    uint32_t storageOffset = 0;
-                    uint8_t tagUid[10] = {};
-                    bool found = false;
-                    uint16_t foundId = 0;
-                    for (uint16_t nfcId = 0; nfcId < MAX_NFCS; nfcId++)
-                    {
-                        storageOffset = ACC_CalcNfcStorageOffset(nfcId);
-                        _nfcStorage.read(storageOffset, tagUid, 10);
-                        if (!memcmp(tagUid, uniqueId, uniqueIdLength))
-                        {
-                            found = true;
-                            foundId = nfcId;
-                            break;
-                        }
-                    }
-
-                    if (found)
-                    {
-                        logDebugP("Tag found (id=%u)", foundId);
-                        processNfcScanSuccess(foundId);
-                    }
-                    else
-                    {
-                        logInfoP("Tag not found");
-                        KoACC_NfcScanSuccess.value(false, DPT_Switch);
-                
-                        sendScanAccessData(SyncType::NFC, false);
-                
-                        // if NFC tag present, but scan failed, reset all authentication action calls
-                        for (uint16_t i = 0; i < ParamACC_VisibleActions; i++)
-                            _channels[i]->resetActionCall();
-
-                        switchLedRedPower(true);
-                        resetTouchPcbLedTimer = delayTimerInit();
-                    }
-                }
-            }
-            else
-                testModeNfcFound = true;
-
-            logIndentDown();
-            break;
-        case tagStatus::removed:
-            logDebugP("Tag removed.");
-            break;
-    }
-
-    nciState currentNciState = nci::getState();
-    if (currentNciState == nciState::error)
-    {
-        nci::reset();
-        logDebugP("NCI reset.");
-    }
+#ifdef OPENKNX_ACC_NFC_READER
+    if(testMode){openknxNfc.loop();testModeNfcFound=openknxNfc.testTagFound();}
 #endif
 }
 
@@ -2934,7 +2783,7 @@ void AccessControl::runTestMode(uint8_t testModeNfc, bool testModeKeypad)
     logIndentDown();
 #endif
 
-#ifndef OPENKNX_ACC_DISABLE_LEGACY_NFC
+#ifdef OPENKNX_NFC_PN7160
     if (testModeNfc > 0)
     {
         logInfoP("Waiting for NFC tag:");
@@ -2943,6 +2792,7 @@ void AccessControl::runTestMode(uint8_t testModeNfc, bool testModeKeypad)
         u_int32_t nfcWaitTimer = delayTimerInit();
         while (!testModeNfcFound && !delayCheck(nfcWaitTimer, 10000))
             loopNfc(true);
+        openknxNfc.endTest();
         logIndentDown();
     }
 
@@ -2983,7 +2833,7 @@ AccessControl openknxAccessControl;
 // {
 //     return 10;
 // }
-#if (defined(OPENKNX_HOMEKEY_ENABLED) || defined(OPENKNX_ACC_NFC_READER)) && defined(ARDUINO_ARCH_ESP32)
+#if defined(OPENKNX_HOMEKEY_ENABLED) || defined(OPENKNX_ACC_NFC_READER)
 bool AccessControl::homeKeyAccessIdAvailable(uint16_t id)
 {
     if (!knx.configured() || id >= MAX_NFCS || (enrollNfcStarted && enrollNfcId == id))
@@ -3011,6 +2861,10 @@ void AccessControl::rejectExternalCredential()
     sendScanAccessData(SyncType::NFC, false);
     for (uint16_t i = 0; i < ParamACC_VisibleActions; ++i)
         _channels[i]->resetActionCall();
+#ifdef OPENKNX_NFC_PN7160
+    switchLedRedPower(true);
+    resetTouchPcbLedTimer=delayTimerInit();
+#endif
 }
 
 bool AccessControl::processExternalNfcUid(const uint8_t* uid, uint8_t length, const uint16_t* reserved, size_t count)
@@ -3051,7 +2905,11 @@ bool AccessControl::processExternalNfcUid(const uint8_t* uid, uint8_t length, co
     }
     if (found != ACC_ID_INVALID)
     {
+#ifdef OPENKNX_NFC_PN7160
+        processNfcScanSuccess(found, false); // Preserve PN7160 front-panel LED feedback.
+#else
         processNfcScanSuccess(found, true);
+#endif
         return true;
     }
     rejectExternalCredential();

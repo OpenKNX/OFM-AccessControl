@@ -34,6 +34,9 @@ public:
      */
     virtual bool isConnected() const = 0;
 
+    // Asynchronous drivers can finish discovery setup after init() returns.
+    virtual bool discoveryReady() const { return isConnected(); }
+
     // -------------------------------------------------------------------------
     // Version
     // -------------------------------------------------------------------------

@@ -1,7 +1,10 @@
-#if defined(OPENKNX_ACC_NFC_READER) && defined(ARDUINO_ARCH_ESP32)
+#include "NfcReaderConfig.h"
+#if defined(OPENKNX_ACC_NFC_READER)
 #include "NfcReaderService.h"
 #include "AccessControl.h"
-#ifdef OPENKNX_NFC_ST25R3916_I2C
+#ifdef OPENKNX_NFC_PN7160
+#include "Pn7160ReaderAdapter.hpp"
+#elif defined(OPENKNX_NFC_ST25R3916_I2C)
 #include "St25r3916Reader.hpp"
 #else
 #include "Pn7161ReaderAdapter.hpp"
@@ -11,26 +14,33 @@
 NfcReaderService openknxNfc;
 
 void NfcReaderService::setup() {
+#ifdef ARDUINO_ARCH_ESP32
     if (!events) events = xQueueCreate(4, sizeof(Event));
     if (!events) { failed = true; logError("NFC", "Reader event queue allocation failed"); }
+#endif
 }
 void NfcReaderService::loop() {
-    bool requested = knx.configured() && ParamACC_NfcScanner != 0 && !failed;
-#if defined(OPENKNX_NFC_UID_ONLY) && defined(HK_Enabled)
+    bool requested = (testing || (knx.configured() && ParamACC_NfcScanner != 0)) && !failed;
+#if (defined(OPENKNX_NFC_UID_ONLY) || defined(OPENKNX_NFC_PN7160)) && defined(HK_Enabled)
     // A UID-only image cannot honor an enabled HomeKey policy. Require the
     // matching ETS mode rather than silently weakening that configuration.
-    requested = requested && !ParamHK_Enabled;
+    requested = requested && (testing || !ParamHK_Enabled);
 #endif
     if (!requested) { if (running) suspend(); return; }
     running = true;
+#ifdef ARDUINO_ARCH_ESP32
     if (!task && (!extension || extension->nfcReady())) {
         if (xTaskCreate([](void* self) { static_cast<NfcReaderService*>(self)->run(); },
             "AccessNfc", OPENKNX_NFC_STACK_SIZE, this, 1, &task) != pdPASS) {
             failed = true; suspend(); logError("NFC", "Reader task allocation failed; reboot required"); return;
         }
     }
+#else
+    if(!extension||extension->nfcReady())pollCooperative();
+    else if(cooperativeConnected){reader->stop();cooperativeConnected=false;cooperativeRetry=false;}
+#endif
     Event event;
-    for (unsigned i=0; i<4 && events && xQueueReceive(events,&event,0)==pdTRUE; ++i) {
+    for (unsigned i=0; i<4 && receive(event); ++i) {
         if (!running || event.epoch != epoch) continue;
         switch (event.kind) {
         case Kind::Ready: logInfo("NFC", "Reader initialized; RF discovery active"); break;
@@ -47,16 +57,34 @@ void NfcReaderService::loop() {
     }
 }
 void NfcReaderService::send(Kind kind, uint32_t scanEpoch, uint32_t token, const std::vector<uint8_t>* uid) {
-    if (!running || scanEpoch != epoch || !events) return;
+    if (!running || scanEpoch != epoch) return;
+#ifdef ARDUINO_ARCH_ESP32
+    if (!events) return;
+#endif
     Event event{}; event.kind=kind;event.epoch=scanEpoch;event.token=token;
     if (uid) {
         if (uid->size()!=4 && uid->size()!=7 && uid->size()!=10) return;
         event.length=uid->size();std::copy(uid->begin(),uid->end(),event.uid);
     }
+#ifdef ARDUINO_ARCH_ESP32
     xQueueSend(events,&event,0); // Overflow drops access, never grants it.
+#else
+    if(queueCount<events.size()) { events[(queueHead+queueCount)%events.size()]=event;++queueCount; }
+#endif
 }
-void NfcReaderService::run() {
-#ifdef OPENKNX_NFC_ST25R3916_I2C
+void NfcReaderService::createReader() {
+#ifdef OPENKNX_NFC_PN7160
+    PN7160Reader::Config config;
+    config.irq=NFC_IRQ_PIN;config.ven=NFC_VEN_PIN;config.address=NFC_PN7160_ADDR;
+#ifdef NFC_DWL_REQ_PIN
+    config.dwl=NFC_DWL_REQ_PIN;
+#endif
+#ifdef ARDUINO_ARCH_ESP32
+    config.wire=&OPENKNX_GPIO_WIRE;config.sda=OPENKNX_GPIO_SDA;config.scl=OPENKNX_GPIO_SCL;
+    config.clock=OPENKNX_GPIO_CLOCK;
+#endif
+    reader=std::make_unique<Pn7160ReaderAdapter>(config,ecp);
+#elif defined(OPENKNX_NFC_ST25R3916_I2C)
     reader=std::make_unique<St25r3916Reader>(OPENKNX_GPIO_WIRE,OPENKNX_GPIO_SDA,OPENKNX_GPIO_SCL,
         ecp,OPENKNX_ST25R3916_I2C_ADDRESS,OPENKNX_GPIO_CLOCK);
 #else
@@ -79,7 +107,25 @@ void NfcReaderService::run() {
 #endif
     reader=std::make_unique<Pn7161ReaderAdapter>(config,ecp);
 #endif
-    bool connected=false;
+}
+bool NfcReaderService::receive(Event& event) {
+#ifdef ARDUINO_ARCH_ESP32
+    return events && xQueueReceive(events,&event,0)==pdTRUE;
+#else
+    if(!queueCount)return false;
+    event=events[queueHead];queueHead=(queueHead+1)%events.size();--queueCount;return true;
+#endif
+}
+void NfcReaderService::routeTag(uint32_t scanEpoch,uint32_t token,const std::vector<uint8_t>& uid,uint8_t sak) {
+    if(uid.size()!=4&&uid.size()!=7&&uid.size()!=10)return;
+    if(testing){testSeen=true;return;} // Hardware test must never enroll or grant access.
+    const bool handled=extension && extension->processNfcTag(*reader,uid,sak);
+    if(!handled)send(Kind::Uid,scanEpoch,token,&uid);
+}
+#ifdef ARDUINO_ARCH_ESP32
+void NfcReaderService::run() {
+    createReader();
+    bool connected=false,announced=false;
     std::array<uint8_t,18> appliedEcp{};
     uint32_t appliedEpoch=UINT32_MAX;
     for (;;) {
@@ -95,7 +141,9 @@ void NfcReaderService::run() {
         if (connected && appliedEpoch!=scanEpoch) { reader->stop();connected=false; }
         if (!connected) {
             connected=reader->init() && reader->beginDiscovery();
-            send(connected ? Kind::Ready : Kind::Failed,scanEpoch);
+            announced=connected&&reader->discoveryReady();
+            if(announced)send(Kind::Ready,scanEpoch);
+            if(!connected)send(Kind::Failed,scanEpoch);
             if (!connected) { reader->stop();vTaskDelay(pdMS_TO_TICKS(5000));continue; }
             appliedEcp=ecp;appliedEpoch=scanEpoch;
         } else if (ecp!=appliedEcp) {
@@ -103,17 +151,47 @@ void NfcReaderService::run() {
             appliedEcp=ecp;
         }
         std::vector<uint8_t> uid;std::array<uint8_t,2> atqa{};uint8_t sak=0;
-        if (reader->pollForTag(uid,atqa,sak,250) && running && scanEpoch==epoch) {
+        const bool found=reader->pollForTag(uid,atqa,sak,250);
+        if(!announced&&reader->discoveryReady()){send(Kind::Ready,scanEpoch);announced=true;}
+        if (found && running && scanEpoch==epoch) {
             send(Kind::Detected,scanEpoch);
-            const bool handled=extension && extension->processNfcTag(*reader,uid,sak);
-            if (!handled) send(Kind::Uid,scanEpoch,token,&uid);
+            routeTag(scanEpoch,token,uid,sak);
             const TickType_t detected=xTaskGetTickCount();
             while (running && scanEpoch==epoch && reader->isTagStillPresent() &&
                    xTaskGetTickCount()-detected<pdMS_TO_TICKS(10000)) vTaskDelay(pdMS_TO_TICKS(100));
             reader->releaseTag();
         }
-        if (!reader->healthCheck()) { reader->stop();connected=false; }
+        if (!reader->healthCheck()) {
+            reader->stop();connected=false;send(Kind::Failed,scanEpoch);
+            vTaskDelay(pdMS_TO_TICKS(5000));continue;
+        }
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
+#else
+void NfcReaderService::pollCooperative() {
+    // One NCI step per main-loop iteration; never sleep or wait for RF here.
+    if(!reader)createReader();
+    if(cooperativeRetry && uint32_t(millis()-cooperativeRetryAt)<5000)return;
+    cooperativeRetry=false;
+    if(!cooperativeConnected){
+        ecp.fill(0);
+        cooperativeConnected=reader->init()&&reader->beginDiscovery();
+        cooperativeAnnounced=false;
+        if(!cooperativeConnected){reader->stop();cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,epoch);return;}
+    }
+    uint32_t token=0;
+    std::array<uint8_t,18> desired{};
+    if(extension && !extension->prepareNfc(desired,token))return;
+    if(desired!=ecp){ecp=desired;if(!reader->updateECP()){reader->stop();cooperativeConnected=false;return;}}
+    const uint32_t scanEpoch=epoch;
+    std::vector<uint8_t> uid;std::array<uint8_t,2> atqa{};uint8_t sak=0;
+    const bool found=reader->pollForTag(uid,atqa,sak,0);
+    if(!cooperativeAnnounced&&reader->discoveryReady()){send(Kind::Ready,scanEpoch);cooperativeAnnounced=true;}
+    if(found && running && scanEpoch==epoch){send(Kind::Detected,scanEpoch);routeTag(scanEpoch,token,uid,sak);reader->releaseTag();}
+    if(!reader->healthCheck()){
+        reader->stop();cooperativeConnected=false;cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,scanEpoch);
+    }
+}
+#endif
 #endif
