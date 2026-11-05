@@ -72,6 +72,7 @@ private:
     uint32_t epoch=0;
 #endif
     bool failed = false;
+    bool policyBlocked = false;
 #ifdef ARDUINO_ARCH_ESP32
     TaskHandle_t task = nullptr;
     QueueHandle_t events = nullptr;

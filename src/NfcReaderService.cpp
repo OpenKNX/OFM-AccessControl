@@ -14,6 +14,7 @@
 NfcReaderService openknxNfc;
 
 void NfcReaderService::setup() {
+    if (!reader) createReader();
 #ifdef ARDUINO_ARCH_ESP32
     if (!events) events = xQueueCreate(4, sizeof(Event));
     if (!events) { failed = true; logError("NFC", "Reader event queue allocation failed"); }
@@ -21,10 +22,14 @@ void NfcReaderService::setup() {
 }
 void NfcReaderService::loop() {
     bool requested = (testing || (knx.configured() && ParamACC_NfcScanner != 0)) && !failed;
-#if (defined(OPENKNX_NFC_UID_ONLY) || defined(OPENKNX_NFC_PN7160)) && defined(HK_Enabled)
+#if defined(HK_Enabled)
     // A UID-only image cannot honor an enabled HomeKey policy. Require the
     // matching ETS mode rather than silently weakening that configuration.
-    requested = requested && (testing || !ParamHK_Enabled);
+    const bool unsupported = ParamHK_Enabled && (!extension || !reader->capabilities().homeKey());
+    if (requested && !testing && unsupported && !policyBlocked)
+        logWarning("NFC", "HomeKey requested but reader or firmware lacks ISO-DEP/ECP support; scanning disabled");
+    policyBlocked = unsupported;
+    requested = requested && (testing || !unsupported);
 #endif
     if (!requested) { if (running) suspend(); return; }
     running = true;
@@ -124,7 +129,6 @@ void NfcReaderService::routeTag(uint32_t scanEpoch,uint32_t token,const std::vec
 }
 #ifdef ARDUINO_ARCH_ESP32
 void NfcReaderService::run() {
-    createReader();
     bool connected=false,announced=false;
     std::array<uint8_t,18> appliedEcp{};
     uint32_t appliedEpoch=UINT32_MAX;
@@ -152,7 +156,12 @@ void NfcReaderService::run() {
             appliedEcp=ecp;
         }
         std::vector<uint8_t> uid;std::array<uint8_t,2> atqa{};uint8_t sak=0;
-        const bool found=reader->pollForTag(uid,atqa,sak,250);
+        const auto result=reader->pollTag(uid,atqa,sak,250);
+        if (result==NfcPollResult::ReaderError) {
+            reader->stop();connected=false;send(Kind::Failed,scanEpoch);
+            vTaskDelay(pdMS_TO_TICKS(5000));continue;
+        }
+        const bool found=result==NfcPollResult::TagFound;
         if(!announced&&reader->discoveryReady()){send(Kind::Ready,scanEpoch);announced=true;}
         if (found && running && scanEpoch==epoch) {
             if (presentation.accept(uid,millis())) {
@@ -195,7 +204,11 @@ void NfcReaderService::pollCooperative() {
     if(desired!=ecp){ecp=desired;if(!reader->updateECP()){reader->stop();cooperativeConnected=false;return;}}
     const uint32_t scanEpoch=epoch;
     std::vector<uint8_t> uid;std::array<uint8_t,2> atqa{};uint8_t sak=0;
-    const bool found=reader->pollForTag(uid,atqa,sak,0);
+    const auto result=reader->pollTag(uid,atqa,sak,0);
+    if(result==NfcPollResult::ReaderError){
+        reader->stop();cooperativeConnected=false;cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,scanEpoch);return;
+    }
+    const bool found=result==NfcPollResult::TagFound;
     if(!cooperativeAnnounced&&reader->discoveryReady()){send(Kind::Ready,scanEpoch);cooperativeAnnounced=true;}
     if(found && running && scanEpoch==epoch){
         if(presentation.accept(uid,millis())){send(Kind::Detected,scanEpoch);routeTag(scanEpoch,token,uid,sak);}

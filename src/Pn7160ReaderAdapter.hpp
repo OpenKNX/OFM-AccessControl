@@ -8,7 +8,7 @@ public:
     Pn7160ReaderAdapter(const PN7160Reader::Config& config,const std::array<uint8_t,18>& frame):device(config),ecp(frame){}
     bool init()override{return updateECP()&&device.init();}
     void stop()override{device.stop();}
-    bool isConnected()const override{return device.isConnected();}
+    bool isConnected()const override{return device.isConnected()&&device.healthCheck();}
     bool discoveryReady()const override{return device.discoveryReady();}
     uint8_t getFwMajor()const override{return 0;} // Unknown: not exposed by this NCI API.
     uint8_t getFwMinor()const override{return 0;}

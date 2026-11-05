@@ -7,12 +7,32 @@
 /**
  * @brief Abstract interface for NFC reader implementations.
  *
- * Provides a unified API over the PN532 (command/response) and PN7160 (NCI/event-driven)
- * protocols for the access-control NFC service and optional authentication extensions.
+ * Provides a unified API over the PN7160, PN7161 and ST25R3916
+ * backends for the access-control NFC service and optional authentication extensions.
  */
+struct NfcReaderCapabilities {
+    bool uid = true;
+    bool isoDep = false;
+    bool ecp = false;
+    bool homeKey() const { return isoDep && ecp; }
+};
+enum class NfcPollResult : uint8_t { NoTag, TagFound, ReaderError };
+
 class INfcReader {
 public:
     virtual ~INfcReader() = default;
+    virtual NfcReaderCapabilities capabilities() const { return {}; }
+
+    // Preserve the boolean API for existing callers while providing the service
+    // a result that distinguishes normal RF silence from a transport fault.
+    virtual NfcPollResult pollTag(std::vector<uint8_t>& uid,
+                                 std::array<uint8_t,2>& atqa, uint8_t& sak,
+                                 uint32_t timeoutMs) {
+        uid.clear();atqa.fill(0);sak=0;
+        const bool found = pollForTag(uid,atqa,sak,timeoutMs);
+        if (!isConnected()) { uid.clear();return NfcPollResult::ReaderError; }
+        return found ? NfcPollResult::TagFound : NfcPollResult::NoTag;
+    }
 
     // -------------------------------------------------------------------------
     // Lifecycle
