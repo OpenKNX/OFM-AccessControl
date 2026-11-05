@@ -3,7 +3,7 @@
 #include "NfcReader.hpp"
 #include <Pn7161Reader.hpp>
 
-// Access-control reader adapter. Chip and ISO-DEP implementation lives in ST25R3916.
+// Access-control reader adapter. Chip and ISO-DEP implementation lives in PN7161.
 // The NFC service owns the referenced optional ECP data.
 class Pn7161ReaderAdapter final : public INfcReader {
 public:
@@ -29,7 +29,10 @@ public:
     }
     bool healthCheck() override { return device.healthCheck(); }
     bool updateECP() override {
-        return device.setEcpFrame(ecp.data(), ecp[0] == 0x6A ? ecp.size() : 0);
+        // Before init, stage the frame. A live reader also needs the NCI
+        // configuration command and discovery restart.
+        return device.setEcpFrame(ecp.data(), ecp[0] == 0x6A ? ecp.size() : 0)
+            && (!device.isConnected() || device.updateECP());
     }
 private:
     Pn7161Reader device;
