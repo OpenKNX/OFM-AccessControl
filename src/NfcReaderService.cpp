@@ -131,7 +131,7 @@ void NfcReaderService::run() {
     for (;;) {
         if (!running || (extension && !extension->nfcReady())) {
             if (connected) reader->stop();
-            connected=false;vTaskDelay(pdMS_TO_TICKS(100));continue;
+            connected=false;presentation.reset();vTaskDelay(pdMS_TO_TICKS(100));continue;
         }
         const uint32_t scanEpoch=epoch;
         uint32_t token=0;
@@ -140,6 +140,7 @@ void NfcReaderService::run() {
         ecp=desired;
         if (connected && appliedEpoch!=scanEpoch) { reader->stop();connected=false; }
         if (!connected) {
+            presentation.reset();
             connected=reader->init() && reader->beginDiscovery();
             announced=connected&&reader->discoveryReady();
             if(announced)send(Kind::Ready,scanEpoch);
@@ -154,13 +155,21 @@ void NfcReaderService::run() {
         const bool found=reader->pollForTag(uid,atqa,sak,250);
         if(!announced&&reader->discoveryReady()){send(Kind::Ready,scanEpoch);announced=true;}
         if (found && running && scanEpoch==epoch) {
-            send(Kind::Detected,scanEpoch);
-            routeTag(scanEpoch,token,uid,sak);
-            const TickType_t detected=xTaskGetTickCount();
-            while (running && scanEpoch==epoch && reader->isTagStillPresent() &&
-                   xTaskGetTickCount()-detected<pdMS_TO_TICKS(10000)) vTaskDelay(pdMS_TO_TICKS(100));
+            if (presentation.accept(uid,millis())) {
+                send(Kind::Detected,scanEpoch);
+                routeTag(scanEpoch,token,uid,sak);
+            }
+            // A held ISO-DEP session must not be forcibly released after ten
+            // seconds: that would re-trigger access while the phone stays put.
+            while (running && scanEpoch==epoch && reader->isTagStillPresent()) {
+                presentation.seen(millis());
+                if (!reader->healthCheck()) break;
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            presentation.seen(millis());
             reader->releaseTag();
         }
+        if (!found) presentation.absent(millis());
         if (!reader->healthCheck()) {
             reader->stop();connected=false;send(Kind::Failed,scanEpoch);
             vTaskDelay(pdMS_TO_TICKS(5000));continue;
@@ -175,7 +184,7 @@ void NfcReaderService::pollCooperative() {
     if(cooperativeRetry && uint32_t(millis()-cooperativeRetryAt)<5000)return;
     cooperativeRetry=false;
     if(!cooperativeConnected){
-        ecp.fill(0);
+        ecp.fill(0);presentation.reset();
         cooperativeConnected=reader->init()&&reader->beginDiscovery();
         cooperativeAnnounced=false;
         if(!cooperativeConnected){reader->stop();cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,epoch);return;}
@@ -188,7 +197,10 @@ void NfcReaderService::pollCooperative() {
     std::vector<uint8_t> uid;std::array<uint8_t,2> atqa{};uint8_t sak=0;
     const bool found=reader->pollForTag(uid,atqa,sak,0);
     if(!cooperativeAnnounced&&reader->discoveryReady()){send(Kind::Ready,scanEpoch);cooperativeAnnounced=true;}
-    if(found && running && scanEpoch==epoch){send(Kind::Detected,scanEpoch);routeTag(scanEpoch,token,uid,sak);reader->releaseTag();}
+    if(found && running && scanEpoch==epoch){
+        if(presentation.accept(uid,millis())){send(Kind::Detected,scanEpoch);routeTag(scanEpoch,token,uid,sak);}
+        reader->releaseTag();
+    } else if(!found) presentation.absent(millis());
     if(!reader->healthCheck()){
         reader->stop();cooperativeConnected=false;cooperativeRetry=true;cooperativeRetryAt=millis();send(Kind::Failed,scanEpoch);
     }

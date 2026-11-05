@@ -2,6 +2,7 @@
 #include "NfcReaderConfig.h"
 #if defined(OPENKNX_ACC_NFC_READER)
 #include "NfcReader.hpp"
+#include "NfcPresentation.h"
 #include <array>
 #include <memory>
 #ifdef ARDUINO_ARCH_ESP32
@@ -34,7 +35,7 @@ public:
         running=false;++epoch;
 #ifndef ARDUINO_ARCH_ESP32
         if(reader)reader->stop();
-        cooperativeConnected=false;cooperativeRetry=false;
+        cooperativeConnected=false;cooperativeRetry=false;presentation.reset();
         queueCount=queueHead=0;
 #endif
     }
@@ -83,6 +84,7 @@ private:
     NfcReaderExtension* extension = nullptr;
     std::array<uint8_t,18> ecp{};
     std::unique_ptr<INfcReader> reader;
+    NfcPresentation presentation;
 };
 extern NfcReaderService openknxNfc;
 #endif
