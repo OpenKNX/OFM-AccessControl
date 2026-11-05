@@ -72,6 +72,10 @@ class AccessControl : public OpenKNX::Module
     void loop() override;
     void setup() override;
     void processAfterStartupDelay() override;
+#ifdef OPENKNX_ACC_NFC_READER
+    void processBeforeTablesUnload() override;
+    void processBeforeRestart() override;
+#endif
     void processInputKo(GroupObject &ko) override;
 		bool processFunctionProperty(uint8_t objectIndex, uint8_t propertyId, uint8_t length, uint8_t *data, uint8_t *resultData, uint8_t &resultLength) override;
 		// bool processFunctionPropertyState(uint8_t objectIndex, uint8_t propertyId, uint8_t length, uint8_t *data, uint8_t *resultData, uint8_t &resultLength) override;
@@ -87,8 +91,9 @@ class AccessControl : public OpenKNX::Module
     // uint16_t flashSize() override;
 
   private:
-#if defined(OPENKNX_HOMEKEY_ENABLED) && defined(ARDUINO_ARCH_ESP32)
+#if (defined(OPENKNX_HOMEKEY_ENABLED) || defined(OPENKNX_ACC_NFC_READER)) && defined(ARDUINO_ARCH_ESP32)
     friend class HomeKeyModule;
+    friend class NfcReaderService;
     bool homeKeyAccessIdAvailable(uint16_t id);
     bool processHomeKeyCredential(uint16_t id);
     bool processExternalNfcUid(const uint8_t* uid, uint8_t length, const uint16_t* reserved, size_t count);

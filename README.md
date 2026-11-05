@@ -81,3 +81,23 @@ Use `OPENKNX_ACC_DISABLE_LEGACY_NFC` and `lib_ignore = PN7160` for this backend;
 OFM-HomeKey owns the reader. Ordinary tag enrollment remains available through
 that owner when allowed in ETS. RP2040 and the legacy ESP32 PN7160 targets do
 not compile this adapter and retain their reader paths.
+
+
+## Shared ESP32 NFC reader service
+
+`OPENKNX_ACC_NFC_READER` selects the generic `NfcReaderService` instead of the
+legacy PN7160 loop. The service owns its RTOS task/queue and reader instance;
+UID enrollment and actions reuse the existing NFC storage and main-thread path.
+ETS download/restart suspends scanning and invalidates queued results with an
+epoch. Queue overflow and initialization/task failures cannot grant access.
+The legacy PN7160 path and non-ESP32 targets are unchanged.
+
+An optional `NfcReaderExtension` supplies ECP bytes, readiness, tag authentication
+and main-thread UID policy checks. It contains no HomeKey types. No extension
+means ordinary UID scanning with zero ECP. A tag consumed by an extension can
+never enter the UID fallback path. The PN7161 and ST25R3916 hardware drivers live
+in their independent libraries; the adapters here implement `INfcReader`.
+
+`OPENKNX_NFC_UID_ONLY` images require HomeKey disabled in ETS when the application
+has that parameter. The application provides REG1 PN7161 and ST25R3916 UID-only
+IP environments that exclude OFM-HomeKey, HomeSpan and DigitalDoorKey.

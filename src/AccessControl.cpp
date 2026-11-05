@@ -1,5 +1,8 @@
 #include "AccessControl.h"
 #include "I2CDev.h"
+#ifdef OPENKNX_ACC_NFC_READER
+#include "NfcReaderService.h"
+#endif
 #include "KeypadEmpty.h"
 #include "KeypadForGira.h"
 #include "KeypadMatrix3x4.h"
@@ -116,7 +119,9 @@ void AccessControl::dispatchAuthAction(bool started) {
 
 void AccessControl::initNfc(bool testMode, uint8_t testModeNfc)
 {
-#ifdef OPENKNX_ACC_DISABLE_LEGACY_NFC
+#ifdef OPENKNX_ACC_NFC_READER
+    openknxNfc.setup();
+#elif defined(OPENKNX_ACC_DISABLE_LEGACY_NFC)
     logInfoP("Legacy NFC reader disabled for this target.");
 #else
     if (!testMode &&
@@ -349,6 +354,11 @@ void AccessControl::interruptTouchRight()
 
 void AccessControl::loop()
 {
+#ifdef OPENKNX_ACC_NFC_READER
+    // Drain credentials even during action delays, so a scan made while
+    // locked/delayed is rejected now, never replayed after the delay expires.
+    openknxNfc.loop();
+#endif
     if (delayCallbackActive)
         return;
 
@@ -1092,7 +1102,7 @@ void AccessControl::processInputKoEnrollFinger(GroupObject &ko)
 
 void AccessControl::processInputKoEnrollNfc(GroupObject &ko)
 {
-#if defined(OPENKNX_ACC_DISABLE_LEGACY_NFC) && !defined(OPENKNX_HOMEKEY_ENABLED)
+#if defined(OPENKNX_ACC_DISABLE_LEGACY_NFC) && !defined(OPENKNX_HOMEKEY_ENABLED) && !defined(OPENKNX_ACC_NFC_READER)
     logInfoP("NFC enrollment unavailable: legacy reader disabled.");
     return;
 #endif
@@ -2209,7 +2219,7 @@ void AccessControl::handleFunctionPropertySetFingerPassword(uint8_t *data, uint8
 
 void AccessControl::handleFunctionPropertyEnrollNfc(uint8_t *data, uint8_t *resultData, uint8_t &resultLength)
 {
-#if defined(OPENKNX_ACC_DISABLE_LEGACY_NFC) && !defined(OPENKNX_HOMEKEY_ENABLED)
+#if defined(OPENKNX_ACC_DISABLE_LEGACY_NFC) && !defined(OPENKNX_HOMEKEY_ENABLED) && !defined(OPENKNX_ACC_NFC_READER)
     resultData[0] = 1;
     resultLength = 1;
     return;
@@ -2973,7 +2983,7 @@ AccessControl openknxAccessControl;
 // {
 //     return 10;
 // }
-#if defined(OPENKNX_HOMEKEY_ENABLED) && defined(ARDUINO_ARCH_ESP32)
+#if (defined(OPENKNX_HOMEKEY_ENABLED) || defined(OPENKNX_ACC_NFC_READER)) && defined(ARDUINO_ARCH_ESP32)
 bool AccessControl::homeKeyAccessIdAvailable(uint16_t id)
 {
     if (!knx.configured() || id >= MAX_NFCS || (enrollNfcStarted && enrollNfcId == id))
@@ -3047,4 +3057,9 @@ bool AccessControl::processExternalNfcUid(const uint8_t* uid, uint8_t length, co
     rejectExternalCredential();
     return false;
 }
+#endif
+
+#ifdef OPENKNX_ACC_NFC_READER
+void AccessControl::processBeforeTablesUnload() { openknxNfc.suspend(); }
+void AccessControl::processBeforeRestart() { openknxNfc.suspend(); }
 #endif
