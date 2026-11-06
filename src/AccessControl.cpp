@@ -265,10 +265,12 @@ void AccessControl::initFlashNfc()
         for (size_t i = 0; i < _nfcStorage.size() / sizeof(clearBuffer); i++)
             _nfcStorage.write(sizeof(clearBuffer) * i, clearBuffer, sizeof(clearBuffer));
         _nfcStorage.commit();
+    ++nfcRevision;
         logDebugP("Flash cleared.");
 
         _nfcStorage.writeInt(0, OPENKNX_ACC_FLASH_NFC_MAGIC_WORD);
         _nfcStorage.commit();
+    ++nfcRevision;
         logDebugP("Indentification code written.");
 
         logIndentDown();
@@ -768,6 +770,7 @@ bool AccessControl::deleteNfc(uint16_t nfcId, bool sync)
         _nfcStorage.write(storageOffset, *emptyTest, 10);
         _nfcStorage.write(storageOffset + 10, *personName, 28);
         _nfcStorage.commit();
+    ++nfcRevision;
 
         if (sync)
             startSyncDelete(SyncType::NFC, nfcId);
@@ -1556,6 +1559,7 @@ void AccessControl::processSyncReceive(uint8_t* data)
                 storageOffset = ACC_CalcNfcStorageOffset(syncReceiveSyncId);
                 _nfcStorage.write(storageOffset, syncSendBufferTemp, OPENKNX_ACC_FLASH_NFC_DATA_SIZE);
                 _nfcStorage.commit();
+    ++nfcRevision;
                 break;
             case SyncType::KEY:
                 storageOffset = ACC_CalcKeyStorageOffset(syncReceiveSyncId);
@@ -1573,6 +1577,43 @@ bool AccessControl::processFunctionProperty(uint8_t objectIndex, uint8_t propert
 {
     if (!knx.configured() || objectIndex != 160 || propertyId != 3)
         return false;
+
+    if (!length || !data) return false;
+    // Reject malformed NFC requests before touching storage or reading payloads.
+    const uint8_t command = data[0];
+    const bool hasId = command == 101 || command == 102 || command == 103 || command == 104 || command == 111;
+    if ((hasId && length < 3) || (command == 101 && (length < 4 || length > 31)) ||
+        (command == 104 && (length < 14 || length > 41)) || (command == 112 && (length < 12 || length > 39)) ||
+        (command == 113 && length != 7)) {
+        resultData[0] = 2; resultLength = 1; return true;
+    }
+    uint8_t padded[41] = {};
+    if (command == 101 || command == 104 || command == 112) {
+        if (data[length-1] != 0 && length != (command == 101 ? 31 : command == 104 ? 41 : 39)) {
+            resultData[0] = 2; resultLength = 1; return true;
+        }
+        memcpy(padded, data, length); data = padded;
+    }
+    if (hasId) {
+        const uint16_t id = (uint16_t(data[1]) << 8) | data[2];
+        if (id >= MAX_NFCS) { resultData[0] = 2; resultLength = 1; return true; }
+#ifdef OPENKNX_ACC_NFC_READER
+        if ((command == 101 || command == 104) && openknxNfc.idReserved(id)) {
+            resultData[0] = 3; resultLength = 1; return true;
+        }
+#endif
+        if (command == 104) {
+            const uint8_t empty[10] = {};
+            if (memcmp(data + 3, empty, 10)) {
+                uint8_t existing[10];
+                for (uint16_t other = 0; other < MAX_NFCS; ++other) {
+                    if (other == id) continue;
+                    _nfcStorage.read(ACC_CalcNfcStorageOffset(other), existing, 10);
+                    if (!memcmp(existing, data + 3, 10)) { resultData[0] = 4; resultLength = 1; return true; }
+                }
+            }
+        }
+    }
 
     switch(data[0])
     {
@@ -1623,6 +1664,9 @@ bool AccessControl::processFunctionProperty(uint8_t objectIndex, uint8_t propert
             return true;
         case 111:
             handleFunctionPropertySearchTagByNfcId(data, resultData, resultLength, length == 4 && data[3] == 1);
+            return true;
+        case 113:
+            handleFunctionPropertyListNfc(data, resultData, resultLength);
             return true;
         case 112:
             handleFunctionPropertySearchNfcIdByTag(data, resultData, resultLength);
@@ -2080,7 +2124,7 @@ void AccessControl::handleFunctionPropertyEnrollNfc(uint8_t *data, uint8_t *resu
     uint16_t nfcId = (data[1] << 8) | data[2];
     logDebugP("nfcId: %d", nfcId);
 
-    uint8_t tagName[28] = {};
+    uint8_t tagName[29] = {};
     for (uint8_t i = 0; i < 28; i++)
     {
         memcpy(tagName + i, data + 3 + i, 1);
@@ -2096,6 +2140,7 @@ void AccessControl::handleFunctionPropertyEnrollNfc(uint8_t *data, uint8_t *resu
     _nfcStorage.write(storageOffset, *tagUid, 10);
     _nfcStorage.write(storageOffset + 10, tagName, 28);
     _nfcStorage.commit();
+    ++nfcRevision;
 
     enrollNfcStarted = delayTimerInit();
     enrollNfcId = nfcId;
@@ -2159,14 +2204,14 @@ void AccessControl::handleFunctionPropertyChangeNfc(uint8_t *data, uint8_t *resu
     logDebugP("tagUid (empty=%u):", tagUidEmpty);
     logHexDebugP(tagUid, 10);
 
-    uint8_t tagName[28] = {};
+    uint8_t tagName[29] = {};
     bool tagNameEmpty = false;
     for (uint8_t i = 0; i < 28; i++)
     {
         memcpy(tagName + i, data + 13 + i, 1);
         if (tagName[i] == 0) // null termination
         {
-            tagUidEmpty = i == 0;
+            tagNameEmpty = i == 0;
             break;
         }
     }
@@ -2179,6 +2224,7 @@ void AccessControl::handleFunctionPropertyChangeNfc(uint8_t *data, uint8_t *resu
     if (!tagNameEmpty)
         _nfcStorage.write(storageOffset + 10, tagName, 28);
     _nfcStorage.commit();
+    ++nfcRevision;
 
     syncRequestedNfcId = nfcId;
     syncRequestedNfcTimer = delayTimerInit();
@@ -2231,6 +2277,7 @@ void AccessControl::handleFunctionPropertyResetNfcScanner(uint8_t *data, uint8_t
         _nfcStorage.write(storageOffset, *nfcData, OPENKNX_ACC_FLASH_NFC_DATA_SIZE);
     }
     _nfcStorage.commit();
+    ++nfcRevision;
 
     switchLedGreenPower(true);
     resetTouchPcbLedTimer = delayTimerInit();
@@ -2256,7 +2303,7 @@ void AccessControl::handleFunctionPropertySearchTagByNfcId(uint8_t *data, uint8_
     _nfcStorage.read(storageOffset, tagUid, 10);
     if (memcmp(emptyTest, tagUid, 10))
     {
-        uint8_t tagName[28] = {};
+        uint8_t tagName[29] = {};
         _nfcStorage.read(storageOffset + 10, tagName, 28);
 
         if (!quiet) logDebugP("Found:");
@@ -2895,6 +2942,7 @@ bool AccessControl::processExternalNfcUid(const uint8_t* uid, uint8_t length, co
         {
             _nfcStorage.write(ACC_CalcNfcStorageOffset(enrollNfcId), padded, sizeof(padded));
             _nfcStorage.commit();
+    ++nfcRevision;
             switchLedGreenPower(true);
         }
         else
@@ -2921,3 +2969,29 @@ bool AccessControl::processExternalNfcUid(const uint8_t* uid, uint8_t length, co
 void AccessControl::processBeforeTablesUnload() { openknxNfc.suspend(); }
 void AccessControl::processBeforeRestart() { openknxNfc.suspend(); }
 #endif
+
+// Complete, bounded UID snapshot, including unnamed credentials. Maximum reply 209 bytes.
+void AccessControl::handleFunctionPropertyListNfc(uint8_t *data, uint8_t *out, uint8_t &length)
+{
+    uint16_t cursor = (uint16_t(data[1]) << 8) | data[2];
+    uint32_t revision = (uint32_t(data[3]) << 24) | (uint32_t(data[4]) << 16) | (uint32_t(data[5]) << 8) | data[6];
+    out[0] = 8; out[1] = 1; length = 2;
+    if (cursor > MAX_NFCS) return;
+    if (cursor == 0 && revision == 0) nfcListCursor = 0;
+    else if (revision != nfcRevision || cursor != nfcListCursor) return;
+    out[0] = 0;
+    out[2] = nfcRevision >> 24; out[3] = nfcRevision >> 16; out[4] = nfcRevision >> 8; out[5] = nfcRevision;
+    uint8_t count = 0, record[38], empty[10] = {};
+    while (cursor < MAX_NFCS && count < 5) {
+        _nfcStorage.read(ACC_CalcNfcStorageOffset(cursor), record, 38);
+        if (memcmp(record, empty, 10)) {
+            const size_t offset = 9 + count * 40;
+            out[offset] = cursor >> 8; out[offset+1] = cursor;
+            memcpy(out+offset+2, record, 38); ++count;
+        }
+        ++cursor;
+    }
+    nfcListCursor = cursor;
+    out[6] = cursor >> 8; out[7] = cursor; out[8] = count;
+    length = 9 + count * 40;
+}

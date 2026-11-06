@@ -20,6 +20,7 @@
 class NfcReaderExtension {
 public:
     virtual ~NfcReaderExtension() = default;
+    virtual bool nfcIdReserved(uint16_t) { return false; }
     virtual bool nfcReady() const = 0;
     virtual bool prepareNfc(std::array<uint8_t,18>& ecp, uint32_t& token) = 0;
     // True consumes the tag; false requests ordinary UID processing.
@@ -29,6 +30,7 @@ public:
 
 class NfcReaderService {
 public:
+    bool idReserved(uint16_t id) { return extension && extension->nfcIdReserved(id); }
     void setup();
     void loop();
     void suspend() {

@@ -569,7 +569,7 @@
                 <!-- Fingerprint Reader -->
                 <choose ParamRefId="%AID%_UP-%T%000002_R-%T%00000201">
                   <when test="0 1 2">
-                    <ParameterBlock Id="%AID%_PB-nnn" Icon="fingerprint" Text="Fingerprint-Scanner" ShowInComObjectTree="true" >  
+                    <ParameterBlock Id="%AID%_PB-nnn" Icon="fingerprint" Text="Fingerprint-Scanner" ShowInComObjectTree="true" >
                       <ParameterSeparator Id="%AID%_PS-nnn" Text="Hardware-Einstellungen" UIHint="Headline" />
                       <ParameterRefRef RefId="%AID%_UP-%T%000028_R-%T%00002801" IndentLevel="1" HelpContext="%DOC%" />
                       <ParameterSeparator Id="%AID%_PS-nnn" Text="" UIHint="HorizontalRuler" />
@@ -732,7 +732,7 @@
                 <!-- NFC Reader -->
                 <choose ParamRefId="%AID%_UP-%T%000034_R-%T%00003401">
                   <when test="!=0">
-                    <ParameterBlock Id="%AID%_PB-nnn" Icon="nfc-variant" Text="NFC-Scanner" ShowInComObjectTree="true" >  
+                    <ParameterBlock Id="%AID%_PB-nnn" Name="NfcScanner" Icon="nfc-variant" Text="NFC-Scanner" ShowInComObjectTree="true" >
 
                       <ParameterSeparator Id="%AID%_PS-nnn" Text="NFC-Tag bearbeiten" UIHint="Headline" />
                       <ParameterRefRef RefId="%AID%_P-%T%000037_R-%T%00003701" IndentLevel="1" HelpContext="%DOC%" />
@@ -822,7 +822,7 @@
                 <!-- Keypad -->
                 <choose ParamRefId="%AID%_UP-%T%000039_R-%T%00003901">
                   <when test="!=0">
-                    <ParameterBlock Id="%AID%_PB-nnn" Icon="dialpad" Text="Keypad" ShowInComObjectTree="true" >  
+                    <ParameterBlock Id="%AID%_PB-nnn" Icon="dialpad" Text="Keypad" ShowInComObjectTree="true" >
                       <ParameterSeparator Id="%AID%_PS-nnn" Text="Hardware-Einstellungen" UIHint="Headline" />
                       <choose ParamRefId="%AID%_UP-%T%000039_R-%T%00003901">
                         <when test="1">

@@ -621,6 +621,7 @@ function ACC_checkNfcAction(device, online, progress, context) {
 }
 
 function ACC_searchNfcId(device, online, progress, context) {
+    if (typeof NFCUI_search == "function" && device.getParameterByName("NFCUI_Type")) return NFCUI_search(device, online, progress, context, false);
     var parNfcName = device.getParameterByName("NFCACT_NfcName");
     //var parNfcTagUid = device.getParameterByName("NFCACT_NfcTagUid");
     var parNfcId = device.getParameterByName("NFCACT_NfcId");
@@ -704,6 +705,7 @@ function ACC_searchNfcId(device, online, progress, context) {
 }
 
 function ACC_searchNfcName(device, online, progress, context) {
+    if (typeof NFCUI_search == "function" && device.getParameterByName("NFCUI_Type")) return NFCUI_search(device, online, progress, context, true);
     var parNfcName = device.getParameterByName("NFCACT_NfcName");
     //var parNfcTagUid = device.getParameterByName("NFCACT_NfcTagUid");
     var parNfcId = device.getParameterByName("NFCACT_NfcId");
