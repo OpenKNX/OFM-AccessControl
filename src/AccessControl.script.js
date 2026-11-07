@@ -917,7 +917,7 @@ function ACC_deleteNfc(device, online, progress, context) {
 }
 
 function ACC_resetNfcScanner(device, online, progress, context) {
-    progress.setText("NFC: Alle NFC-Tags löschen...");
+    progress.setText("NFC: Alle UID-Tags löschen...");
     online.connect();
 
     var data = [106]; // internal function ID
@@ -929,7 +929,7 @@ function ACC_resetNfcScanner(device, online, progress, context) {
     }
 
     online.disconnect();
-    progress.setText("NFC: Alle NFC-Tags gelöscht.");
+    progress.setText("NFC: Alle UID-Tags gelöscht.");
 }
 
 function ACC_searchKeypadId(device, online, progress, context) {

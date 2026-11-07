@@ -237,7 +237,7 @@
               <Parameter Id="%AID%_P-%T%000025" Name="SyncFingerIdR503S" ParameterType="%AID%_PT-FingerIdR503S" Text="Finger ID synchronisieren" Value="0" />
               <Parameter Id="%AID%_P-%T%000026" Name="SyncFingerId" ParameterType="%AID%_PT-FingerId" Text="Finger ID synchronisieren" Value="0" />
               <Parameter Id="%AID%_P-%T%000033" Name="SyncNfcId" ParameterType="%AID%_PT-NfcId" Text="Tag ID synchronisieren" Value="0" />
-              <Parameter Id="%AID%_P-%T%000035" Name="ResetNfc" ParameterType="%AID%_PT-OnOffYesNo" Text="Alle NFC-Tags löschen?" Value="0" />
+              <Parameter Id="%AID%_P-%T%000035" Name="ResetNfc" ParameterType="%AID%_PT-OnOffYesNo" Text="Alle UID-Tags löschen?" Value="0" />
               <Parameter Id="%AID%_P-%T%000036" Name="FingerEdit" ParameterType="%AID%_PT-FingerEdit" Text="Finger" Value="0" />
               <Parameter Id="%AID%_P-%T%000037" Name="NfcEdit" ParameterType="%AID%_PT-NfcEdit" Text="Vorgang" Value="0" />
               <Parameter Id="%AID%_P-%T%000040" Name="KeypadEdit" ParameterType="%AID%_PT-KeypadEdit" Text="Tastencode" Value="1" />
@@ -791,8 +791,8 @@
                       <ParameterRefRef RefId="%AID%_P-%T%000035_R-%T%00003501" IndentLevel="1" HelpContext="%DOC%" />
                       <choose ParamRefId="%AID%_P-%T%000035_R-%T%00003501">
                         <when test="1">
-                          <ParameterSeparator Id="%AID%_PS-nnn" Text="Wenn Sie diese Funktion ausführen, werden alle gespeicherten NFC-Tags gelöscht und müssen neu angelernt werden." UIHint="Error" />
-                          <Button Id="%AID%_B-%T%92007" Text="Jetzt löschen" Name="resetNfcScanner" EventHandler="ACC_resetNfcScanner" EventHandlerOnline="ConnectionOriented" />
+                          <ParameterSeparator Id="%AID%_PS-nnn" Text="Alle gespeicherten UID-Tags werden gelöscht. HomeKey-Geräte bleiben erhalten." UIHint="Error" />
+                          <Button Id="%AID%_B-%T%92007" Text="UID-Tags löschen" Name="resetNfcScanner" EventHandler="ACC_resetNfcScanner" EventHandlerOnline="ConnectionOriented" />
                         </when>
                       </choose>
 
