@@ -1,9 +1,10 @@
-﻿### NFC-Tag
+### Vorgang
 
-Dieses Auswahlfeld wählt die gewünschte Editierfunktion aus:
+Dieses Auswahlfeld wählt die Bearbeitungsfunktion für den NFC-Tag aus:
 
-* **anlernen**: Zu einer neuen Tag ID soll ein neuer NFC-Tag angelernt werden
-* **anlegen**: Zu einer neuen Tag ID soll ein neuer NFC-Tag angelegt werden, dessen Tag Schlüssel (UID) man kennt.
-* **ändern**: Zu einer bestimmten Tag ID soll der NFC-Tag geändert werden
-* **löschen**: Eine bestimmte Tag ID und die damit verbundenen Tagdaten werden gelöscht.
+* **anlernen**: Einen neuen UID-Tag durch Vorhalten am Leser einer Tag-ID zuordnen.
+* **anlegen**: Einen UID-Tag mit bereits bekannter UID manuell eintragen.
+* **ändern**: Bezeichnung und Daten des ausgewählten UID-Tags bearbeiten.
+* **löschen**: Den ausgewählten UID-Tag einschließlich seiner gespeicherten Daten entfernen.
 
+Die Auswahl allein führt keine Funktion aus. Den Vorgang anschließend mit der passenden Schaltfläche starten. Die Tag-ID bezeichnet den Speicherplatz und die Zuordnung zu Aktionen; sie ist nicht die physische UID.

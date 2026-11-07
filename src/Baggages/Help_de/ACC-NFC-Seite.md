@@ -1,10 +1,9 @@
-﻿### NFC
+### NFC
 
-Erscheint nur, wenn bei NFC-Scanner eine entscprechende Hardware ausgewählt wurde.
+Diese Seite wird angezeigt, wenn ein NFC-Scanner ausgewählt ist.
 
-Im oberen Bereich können bereits angelernte NFC-Tags gesucht werden. So kann man überprüfen, welche NFC-Tags schon bekannt sind. 
+Im oberen Bereich können gespeicherte NFC-Tags nach Bezeichnung oder Tag-ID gesucht werden. In Anwendungen mit gemeinsamer HomeKey-Verwaltung werden zusätzlich die Geräte aus dem aktuellen ETS-Projekt berücksichtigt. Für Online-Abfragen muss das Gerät über die ETS-KNX-Schnittstelle erreichbar sein.
 
-Diese Suchfunktionalität ist leider vollkommen von der Übertragungs-Infrastruktuktur der ETS abhängig, die wiederum von der Topologie und den verwendeten Schnittstellen und Linienkopplern abhängt. Schlagwort hier ist die APDU des Übertragungsweges (es würde zu weit führen, das hier auszuführen - siehe KNX-User-Forum). Für diese Funktion wird eine APDU vom 203 benötigt. Wenn nur eine kleinere APDU verfügbar ist, sollte die Suche nicht verwendet werden.
+Im unteren Bereich werden Zugänge ihren Aktionen zugeordnet. Die Spalte **Tag** enthält die NFC-Tag-ID, die Spalte **Aktion** die Nummer der auszuführenden Aktion. Mehrere Aktionen für dieselbe Tag-ID sind möglich. Änderungen werden mit dem Parameterdownload wirksam.
 
-Im unteren Bereich können angelernte NFC-Tags zu Aktionen zugeordnet werden. Dieser Bereich kann unabhängig von der Übertragungs-Infrastruktur verwendet werden. 
-
+**Info holen** liest Informationen zur ausgewählten Tag-ID ein. Bei HomeKey wird die Bezeichnung aus dem ETS-Projekt verwendet und online geprüft, ob die Geräte-ID im Leser provisioniert ist. Der Leser scannt dabei keinen Tag und erteilt keine Berechtigung.

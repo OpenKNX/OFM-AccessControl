@@ -1,4 +1,4 @@
-﻿### Finger ID synchronisieren
+﻿### Finger-ID synchronisieren
 
-Durch die Eingabe einer Finger ID und das Drücken des Buttons "Synchronisieren" kann hier die Synchronisation eines bestimmten Fingers manuell angestoßen werden.
+Durch die Eingabe einer Finger-ID und das Drücken des Buttons "Synchronisieren" kann hier die Synchronisation eines bestimmten Fingers manuell angestoßen werden.
 

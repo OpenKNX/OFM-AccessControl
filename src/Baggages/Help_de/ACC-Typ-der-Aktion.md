@@ -12,7 +12,7 @@ Diese Aktion kann ein EIN- oder ein AUS-Signal auf den Bus senden. Dazu erschein
 
 ##### Umschalten
 
-Diese Aktion schaltet von EIN auf AUS und umgekehrt. Sie hat ein Ausgangs-KO und ein Eingangs-KO. Das Schaltsignal (Ausgangs-KO) ist immer der Invertierte Wert vom Eingangs-KO. Wird am Eingangs-KO kein Signal vor dem nächsten Schalten empfangen (weil es z.B. nicht mit einer GA verknüpft ist), dann wird der letzte Schaltzustand invertiert gesendet.
+Diese Aktion schaltet von EIN auf AUS und umgekehrt. Sie hat ein Ausgangs-KO und ein Eingangs-KO. Das Schaltsignal (Ausgangs-KO) ist immer der invertierte Wert vom Eingangs-KO. Wird am Eingangs-KO kein Signal vor dem nächsten Schalten empfangen (weil es z.B. nicht mit einer GA verknüpft ist), dann wird der letzte Schaltzustand invertiert gesendet.
 
 ##### Treppenlicht
 

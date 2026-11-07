@@ -1,4 +1,4 @@
-﻿### Rückmelde LED
+﻿### Rückmelde-LED
 
 Erscheint nur bei Keypads mit Rückmelde-LED.
 
@@ -13,7 +13,7 @@ Wurde ein Code nicht erkannt, leuchtet die LED kurz rot.
 Ein Code ist dann nicht erkannt, wenn
 
 * die maximale Anzahl von 10 Zeichen eingegeben wurde und diese keinem Code entsprechen
-* ein Abschlußzeichen festgelegt und eingegeben wurde und der Code falsch ist
+* ein Abschlusszeichen festgelegt und eingegeben wurde und der Code falsch ist
 * für 15 Sekunden kein Zeichen eingegeben wurde
 
 Zusätzlich zu den internen Zuständen kann die Rückmelde-LED auch über ein KO vom KNX-Bus gesteuert werden, um z.B. die erfolgreiche Ausführung einer Aktion anzuzeigen.
