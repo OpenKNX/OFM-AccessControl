@@ -10,6 +10,7 @@
 #include "Pn7161ReaderAdapter.hpp"
 #endif
 #include <algorithm>
+#include "Pn7161NativeI2cBridge.hpp"
 
 NfcReaderService openknxNfc;
 
@@ -96,12 +97,29 @@ void NfcReaderService::createReader() {
 #else
     Pn7161Reader::Config config;
 #if defined(OPENKNX_NFC_READER_I2C) || defined(HOMEKEY_READER_I2C)
-    config.wire=&OPENKNX_GPIO_WIRE;config.sda=OPENKNX_GPIO_SDA;config.scl=OPENKNX_GPIO_SCL;
-    config.irq=NFC_IRQ_PIN;config.ven=NFC_VEN_PIN;config.address=NFC_PN7160_ADDR;
-    config.clock=OPENKNX_GPIO_CLOCK;
-#ifdef NFC_DWL_REQ_PIN
-    config.dwl=NFC_DWL_REQ_PIN;
+#if defined(OPENKNX_GPIO_NUM) && OPENKNX_GPIO_NUM > 0
+    constexpr bool gpioOwnsBus=true;
+#else
+    constexpr bool gpioOwnsBus=false;
 #endif
+    PN7160_I2C_Config native;
+    native.address=NFC_PN7160_ADDR;native.clock_hz=OPENKNX_GPIO_CLOCK;
+    native.irq=static_cast<gpio_num_t>(NFC_IRQ_PIN);
+    native.ven=static_cast<gpio_num_t>(NFC_VEN_PIN);
+#ifdef NFC_DWL_REQ_PIN
+    native.dwl_req=static_cast<gpio_num_t>(NFC_DWL_REQ_PIN);
+#endif
+    // Runtime setClock() removes/re-adds Arduino device handles. It must not
+    // overlap native NFC traffic without shared lifecycle synchronization.
+    if (knx.configured() && ParamACC_Keypad == 1) {
+        failed=true;
+        logError("NFC", "Native I2C does not support the Gira keypad clock switching");
+    } else config.transport=preparePn7161NativeI2c(OPENKNX_GPIO_WIRE,
+        OPENKNX_GPIO_SDA,OPENKNX_GPIO_SCL,native,gpioOwnsBus);
+    if(!config.transport) {
+        failed=true;
+        logError("NFC", "Native I2C unavailable; NFC disabled");
+    }
 #else
     config.spiPins={HOMEKEY_SPI_CS,HOMEKEY_SPI_SCLK,HOMEKEY_SPI_MISO,HOMEKEY_SPI_MOSI};
     config.irq=HOMEKEY_IRQ_PIN;config.ven=HOMEKEY_VEN_PIN;
