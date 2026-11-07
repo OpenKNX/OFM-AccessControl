@@ -239,7 +239,7 @@
               <Parameter Id="%AID%_P-%T%000033" Name="SyncNfcId" ParameterType="%AID%_PT-NfcId" Text="Tag ID synchronisieren" Value="0" />
               <Parameter Id="%AID%_P-%T%000035" Name="ResetNfc" ParameterType="%AID%_PT-OnOffYesNo" Text="Alle NFC-Tags löschen?" Value="0" />
               <Parameter Id="%AID%_P-%T%000036" Name="FingerEdit" ParameterType="%AID%_PT-FingerEdit" Text="Finger" Value="0" />
-              <Parameter Id="%AID%_P-%T%000037" Name="NfcEdit" ParameterType="%AID%_PT-NfcEdit" Text="NFC-Tag" Value="0" />
+              <Parameter Id="%AID%_P-%T%000037" Name="NfcEdit" ParameterType="%AID%_PT-NfcEdit" Text="Vorgang" Value="0" />
               <Parameter Id="%AID%_P-%T%000040" Name="KeypadEdit" ParameterType="%AID%_PT-KeypadEdit" Text="Tastencode" Value="1" />
               <Parameter Id="%AID%_P-%T%000041" Name="ResetKey" ParameterType="%AID%_PT-OnOffYesNo" Text="Alle Tastencodes löschen?" Value="0" />
               <Parameter Id="%AID%_P-%T%000042" Name="SyncCodeId" ParameterType="%AID%_PT-CodeId" Text="Tastencode ID synchronisieren" Value="0" />
