@@ -162,6 +162,7 @@ class AccessControl : public OpenKNX::Module
     void handleFunctionPropertySetFingerPassword(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     uint32_t nfcRevision = 1;
     uint16_t nfcListCursor = 0xffff;
+    void handleFunctionPropertyListNfcAssignments(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertyListNfc(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertyEnrollNfc(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);
     void handleFunctionPropertyWaitEnrollNfcFinished(uint8_t *data, uint8_t *resultData, uint8_t &resultLength);

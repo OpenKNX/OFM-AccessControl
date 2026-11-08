@@ -1,4 +1,5 @@
 #include "AccessControl.h"
+#include "NfcAssignmentSnapshot.h"
 #include "I2CDev.h"
 #ifdef OPENKNX_ACC_NFC_READER
 #include "NfcReaderService.h"
@@ -1584,7 +1585,7 @@ bool AccessControl::processFunctionProperty(uint8_t objectIndex, uint8_t propert
     const bool hasId = command == 101 || command == 102 || command == 103 || command == 104 || command == 111;
     if ((hasId && length < 3) || (command == 101 && (length < 4 || length > 31)) ||
         (command == 104 && (length < 14 || length > 41)) || (command == 112 && (length < 12 || length > 39)) ||
-        (command == 113 && length != 7)) {
+        ((command == 113 || command == 114) && length != 7)) {
         resultData[0] = 2; resultLength = 1; return true;
     }
     uint8_t padded[41] = {};
@@ -1664,6 +1665,9 @@ bool AccessControl::processFunctionProperty(uint8_t objectIndex, uint8_t propert
             return true;
         case 111:
             handleFunctionPropertySearchTagByNfcId(data, resultData, resultLength, length == 4 && data[3] == 1);
+            return true;
+        case 114:
+            handleFunctionPropertyListNfcAssignments(data, resultData, resultLength);
             return true;
         case 113:
             handleFunctionPropertyListNfc(data, resultData, resultLength);
@@ -2994,4 +2998,18 @@ void AccessControl::handleFunctionPropertyListNfc(uint8_t *data, uint8_t *out, u
     nfcListCursor = cursor;
     out[6] = cursor >> 8; out[7] = cursor; out[8] = count;
     length = 9 + count * 40;
+}
+
+void AccessControl::handleFunctionPropertyListNfcAssignments(uint8_t* data,uint8_t* out,uint8_t& length)
+{
+    if(!knx.configured()){out[0]=3;out[1]=1;length=2;return;}
+#ifdef OPENKNX_HOMEKEY_ENABLED
+    constexpr bool homeKey=true;
+#else
+    constexpr bool homeKey=false;
+#endif
+    NfcAssignmentSnapshot::page(data,out,length,
+        std::min<uint16_t>(ParamNFCACT_NfcActionCount,NFCACT_ChannelCount),ParamACC_VisibleActions,homeKey,
+        [&](uint16_t row,unsigned field){return knx.paramWord(NFCACT_ParamBlockOffset+row*NFCACT_ParamBlockSize+
+            (field?NFCACT_FaNfcId:NFCACT_FaActionId));});
 }
