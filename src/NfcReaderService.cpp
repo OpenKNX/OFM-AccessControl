@@ -10,6 +10,10 @@
 #include "Pn7161ReaderAdapter.hpp"
 #endif
 #include <algorithm>
+#ifdef ST25R3916_TIMING_TEST
+#include <esp_timer.h>
+#include <cstdio>
+#endif
 #include "Pn7161NativeI2cBridge.hpp"
 
 NfcReaderService openknxNfc;
@@ -153,7 +157,13 @@ bool NfcReaderService::receive(Event& event) {
 void NfcReaderService::routeTag(uint32_t scanEpoch,uint32_t token,const std::vector<uint8_t>& uid,uint8_t sak) {
     if(uid.size()!=4&&uid.size()!=7&&uid.size()!=10)return;
     if(testing){testSeen=true;return;} // Hardware test must never enroll or grant access.
+#ifdef ST25R3916_TIMING_TEST
+    const auto credentialStart = esp_timer_get_time();
+#endif
     const bool handled=extension && extension->processNfcTag(*reader,uid,sak);
+#ifdef ST25R3916_TIMING_TEST
+    printf("NFC timing: credential=%s handler_us=%lld\n", handled ? "HomeKey/consumed" : "UID", static_cast<long long>(esp_timer_get_time()-credentialStart));
+#endif
     if(!handled)send(Kind::Uid,scanEpoch,token,&uid);
 }
 #ifdef ARDUINO_ARCH_ESP32
