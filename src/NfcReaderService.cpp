@@ -6,6 +6,7 @@
 #include "Pn7160ReaderAdapter.hpp"
 #elif defined(OPENKNX_NFC_ST25R3916_I2C)
 #include "St25r3916Reader.hpp"
+#include "St25r3916NativeI2cBridge.hpp"
 #else
 #include "Pn7161ReaderAdapter.hpp"
 #endif
@@ -96,8 +97,23 @@ void NfcReaderService::createReader() {
 #endif
     reader=std::make_unique<Pn7160ReaderAdapter>(config,ecp);
 #elif defined(OPENKNX_NFC_ST25R3916_I2C)
-    reader=std::make_unique<St25r3916Reader>(OPENKNX_GPIO_WIRE,OPENKNX_GPIO_SDA,OPENKNX_GPIO_SCL,
-        ecp,OPENKNX_ST25R3916_I2C_ADDRESS,OPENKNX_GPIO_CLOCK);
+#if defined(OPENKNX_GPIO_NUM) && OPENKNX_GPIO_NUM > 0
+    constexpr bool gpioOwnsBus=true;
+#else
+    constexpr bool gpioOwnsBus=false;
+#endif
+    i2c_master_bus_handle_t bus=nullptr;
+    if (knx.configured() && ParamACC_Keypad == 1) {
+        failed=true;
+        logError("NFC", "Native I2C does not support the Gira keypad clock switching");
+    } else bus=prepareSt25r3916NativeI2c(OPENKNX_GPIO_WIRE,
+        OPENKNX_GPIO_SDA,OPENKNX_GPIO_SCL,OPENKNX_GPIO_CLOCK,gpioOwnsBus);
+    if (!bus) {
+        failed=true;
+        logError("NFC", "Native ST25R3916 I2C unavailable; NFC disabled");
+    }
+    reader=std::make_unique<St25r3916Reader>(bus,ecp,
+        OPENKNX_ST25R3916_I2C_ADDRESS,OPENKNX_GPIO_CLOCK);
 #else
     Pn7161Reader::Config config;
 #if defined(OPENKNX_NFC_READER_I2C) || defined(HOMEKEY_READER_I2C)
